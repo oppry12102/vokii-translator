@@ -1,0 +1,2 @@
+{"id": "sample_001", "audio": "./audio/sample_001.wav", "ref_zh": "你好,世界", "ref_en": "hello world"}
+{"id": "sample_002", "audio": "./audio/sample_002.wav", "ref_zh": "今天天气不错", "ref_en": "the weather is nice today"}

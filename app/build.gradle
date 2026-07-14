@@ -1,0 +1,130 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.vokii.translator'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.vokii.translator"
+        minSdk 26
+        targetSdk 34
+        versionCode 3
+        versionName "2.1"
+
+        // App is Chinese/English only — drop the ~80 locale translations that
+        // AndroidX/Material libraries ship, trimming resources.arsc.
+        resConfigs "zh", "en"
+
+        // Only ship arm64-v8a: modern Huawei phones only.
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+
+        // BuildConfig fields — populated at configuration time from
+        // local.properties. The API key is gitignored at the source level
+        // (see .gitignore) but ends up compiled into BuildConfig.java, so it
+        // ships inside the APK — anyone who decompiles the APK can recover
+        // it. That's the trade-off for "fresh install just works". Users
+        // who care about key isolation can override at runtime via the
+        // settings screen (persisted to SharedPreferences).
+        Properties localProps = new Properties()
+        File lp = rootProject.file('local.properties')
+        if (lp.exists()) {
+            lp.withInputStream { localProps.load(it) }
+        }
+        String deepseekKey = localProps.getProperty('DEEPSEEK_API_KEY', '').trim()
+        String qwenKey     = localProps.getProperty('QWEN_API_KEY', '').trim()
+
+        buildConfigField "String", "DEFAULT_DEEPSEEK_API_KEY",     "\"${deepseekKey}\""
+        buildConfigField "String", "DEFAULT_DEEPSEEK_ENDPOINT",    "\"https://api.deepseek.com/v1/chat/completions\""
+        buildConfigField "String", "DEEPSEEK_MODEL_FLASH",         "\"deepseek-v4-flash\""
+        buildConfigField "String", "DEEPSEEK_MODEL_PRO",           "\"deepseek-v4-pro\""
+
+        // Qwen-Omni Realtime (DashScope) — active pipeline. Audio is streamed
+        // over a WebSocket; the model returns {zh,en} directly (one-stage).
+        // Endpoint is a wss:// URL; the model id is appended as ?model=.
+        buildConfigField "String", "DEFAULT_QWEN_API_KEY",         "\"${qwenKey}\""
+        buildConfigField "String", "DEFAULT_QWEN_ENDPOINT",        "\"wss://dashscope.aliyuncs.com/api-ws/v1/realtime\""
+        buildConfigField "String", "QWEN_MODEL_FLASH",             "\"qwen3.5-omni-flash-realtime-2026-03-15\""
+        buildConfigField "String", "QWEN_MODEL_PLUS",              "\"qwen3.5-omni-plus-realtime-2026-03-15\""
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../keystore/vokii-release.jks")
+            storePassword "***REMOVED***123"
+            keyAlias "***REMOVED***"
+            keyPassword "***REMOVED***123"
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            lintOptions {
+                abortOnError false
+                checkReleaseBuilds false
+            }
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/LICENSE.txt', 'META-INF/NOTICE']
+        }
+    }
+}
+
+// After every Gradle build (any task, including UP-TO-DATE no-ops), copy
+// the generated APKs up to the parent `work/` folder so the artifacts are
+// easy to grab from the host. Uses buildFinished so it runs unconditionally
+// — finalize/UP-TO-DATE task hooks would be skipped on a cached build.
+gradle.buildFinished { result ->
+    try {
+        // The project lives at <work>/vokii; copy APKs directly into <work>.
+        def workDir = rootProject.projectDir.parentFile
+        ['debug', 'release'].each { variant ->
+            def src = new File(project.buildDir, "outputs/apk/${variant}/app-${variant}.apk")
+            if (src.exists()) {
+                def dst = new File(workDir, "vokii-${variant}.apk")
+                dst.bytes = src.bytes
+                println "[vokii-copy] vokii-${variant}.apk (${src.length()} bytes) -> ${dst}"
+            }
+        }
+    } catch (Throwable t) {
+        logger.warn("[vokii-copy] " + t.message)
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'org.json:json:20231013'
+
+    // ASR: Android system SpeechRecognizer only (Huawei HiSpeech on Huawei ROMs,
+    // Google on AOSP). End-side, no AGC/HMS setup, no quota. Fallback to
+    // NoOpEngine if neither is available — surfaced as a clear error in the
+    // debug panel.
+    //
+    // HMS ML Kit ASR (com.huawei.hms:ml-computer-voice-asr) and the AGCP
+    // plugin have been removed: the cloud-only design required an AGC
+    // project to be published with ML Kit service enabled, which is the
+    // opposite of "offline conversation translator". Translation now flows
+    // mic → Android SR → text → DeepSeek V4 → {zh, en} → UI.
+}
