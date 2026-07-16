@@ -1,33 +1,83 @@
 # Vokii
 
 Android voice translator: speak in Chinese or English, see the other
-language live as you talk. One-stage cloud ASR + translation via
-Qwen-Omni Realtime over a WebSocket — no on-device speech model.
+language live as you talk. Cloud-only — no on-device speech model, no
+GMS/HMS dependency.
 
-Target: Huawei / HarmonyOS phones (HMS works, GMS is *not* required).
+Target: Huawei / HarmonyOS phones and any AOSP device with a working
+network path to DashScope.
 
 ## How it works
 
+The shipped pipeline is **cascade** (the default since v2.2.0):
+
 ```
-mic PCM (16 kHz, mono)
-  → Qwen-Omni Realtime (WebSocket, DashScope)
-  → streamed {zh, en} deltas
-  → bilingual UI cards
+mic PCM (16 kHz, mono, 20 ms frames)
+  │
+  ├─ step 1 ─► fun-asr-realtime ASR  (wss://dashscope.aliyuncs.com/api-ws/v1/inference)
+  │            DashScope task protocol: header/payload envelope + raw
+  │            binary audio + `event`-typed result frames. server_vad
+  │            segments speech at each pause; each segment commits as
+  │            one {sentence_id, text, sentence_end} JSON envelope.
+  │            ──► verbatim transcript (zh + en mixed)
+  │
+  └─ step 2 ─► qwen-plus chat completion
+               (POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+                with `stream: true`, SSE `{choices:[{delta:{content:..}}]}` frames)
+               prompt: emit two-line `ZH:` / `EN:` pair from verbatim
+               ──► bilingual card (zh column / en column)
 ```
 
-The cloud model does recognition AND translation in one shot, so the app
-works on ROMs that don't ship GMS-backed `SpeechRecognizer` (HarmonyOS).
+The split exists because a model that does **only** ASR (fun-asr-realtime,
+trained natively on code-switch zh+en) pays full attention to the audio,
+whereas a joint speech-and-translate model (Qwen-Omni Realtime) splits
+its attention budget across both tasks. fun-asr beats the joint model on
+verbatim error rate while also being smaller and faster. Step 2 then
+delegates translation to a general-purpose LLM via the OpenAI-compatible
+chat endpoint, paying an extra ~0.7 s TTFB per committed sentence.
 
-### Models
+A toggle in Settings switches back to the **joint** Qwen-Omni Realtime
+path if needed (e.g. regions without fun-asr-realtime coverage).
 
-| Model | Speed | Quality | Default? |
-|-------|-------|---------|----------|
-| `qwen3.5-omni-flash-realtime` | ~2× faster | lower | opt-in (Settings) |
-| `qwen3.5-omni-plus-realtime` | slower | **better** | **default** |
+### Why cascade wins
 
-The Pro model is the default because it scored **-39% relative MER** over
-Flash on the CS-Dialogue eval (see [Eval](#eval) below). Switch in
-Settings → Model.
+On CS-Dialogue tier2 (n=240, code-switch zh+en conversation):
+
+| Path | avg MER | Δ vs joint |
+|------|--------:|-----------:|
+| v1 joint (Qwen-Omni Realtime) | 0.1436 | — |
+| cascade1 (paraformer-realtime-v2 step 1) | 0.0869 | **−39 %** |
+| **cascade + fun-asr-realtime step 1** | **0.0693** | **−52 %** |
+
+And on tier1 (n=30, real-time pacing):
+
+| | joint | cascade2 | speedup |
+|---|------:|---------:|--------:|
+| **TTFB median** | 2.97 s | **0.49 s** | **6.05 ×** |
+| Total median | 16.32 s | **5.89 s** | 2.77 × |
+| Total p95 | 44.68 s | 17.46 s | 2.56 × |
+
+Cascade is a **no-trade-off win** — both more accurate AND faster on
+every metric that matters to the user. See
+`tools/eval/REPORT.latency.tier1.cascade2.md` and
+`tools/eval/REPORT.cascade.step3.md` for the full breakdown.
+
+## Settings
+
+Two real knobs (everything else baked into BuildConfig at compile time):
+
+| Control | Default | Effect |
+|--------|---------|--------|
+| DashScope API Key | (blank → use bundled default) | Override the key compiled into the APK |
+| Cascade toggle | **ON** | Off falls back to joint Qwen-Omni Realtime |
+| Debug toggle | OFF | Show the rolling-log panel on the main screen |
+
+The bundled LLM (qwen) has well-known, hardcoded endpoints in the
+engines themselves; the ASR language hint is auto-detected — exposing
+either as a user-editable field invites typos and doesn't actually
+change behaviour. If you need to point at a non-default endpoint or
+pick a different ASR language, build with the right `local.properties`
+entries instead.
 
 ## Build
 
@@ -40,114 +90,94 @@ Requires JDK 17, Android SDK with platform 34, and a DashScope API key.
    QWEN_API_KEY=sk-...
    ```
 
-3. Build the release APK:
+3. Build:
 
    ```bash
-   ./gradlew :app:assembleRelease
+   ./gradlew :app:assembleDebug      # ~5.9 MB, debuggable
+   ./gradlew :app:assembleRelease    # ~1.7 MB, R8-shrunk, signed
    ```
 
-   Output: `app/build/outputs/apk/release/app-release.apk` (also copied
-   to `../vokii-release.apk` by the `buildFinished` hook in
-   `app/build.gradle`).
+   Output: `app/build/outputs/apk/<variant>/app-<variant>.apk`. A
+   `buildFinished` hook in `app/build.gradle` also copies both APKs up
+   one level as `vokii-debug.apk` and `vokii-release.apk`.
 
 The API key is read at configuration time and compiled into
-`BuildConfig.DEFAULT_QWEN_API_KEY`, so the resulting APK ships with a
+`BuildConfig.DEFAULT_QWEN_API_KEY`; the resulting APK ships with a
 working default — anyone who decompiles it can recover the key. That's
 the trade-off for "fresh install just works". Override at runtime in
-Settings; the override is stored in `SharedPreferences` and takes
-precedence.
+Settings; the override takes precedence over the bundled default.
 
-The release keystore lives at `keystore/vokii-release.jks` and is checked
-into this repo (a real release process would not do this; see
+The release keystore lives at `keystore/vokii-release.jks` and is
+checked into this repo (a real release process would not do this; see
 [Security notes](#security-notes)).
 
 ## Eval
 
-`tools/eval/` is a reproducible ASR-accuracy harness. It scores the
-pipeline against [BAAI/CS-Dialogue](https://huggingface.co/datasets/BAAI/CS-Dialogue)
+`tools/eval/` is a reproducible ASR-accuracy + latency harness. It
+scores against [BAAI/CS-Dialogue](https://huggingface.co/datasets/BAAI/CS-Dialogue)
 (Chinese-English code-switch) with **MER (Mixed Error Rate)**: Chinese
 by character, English by word, with NFKC / punctuation-stripped /
 lowercased / 繁→简 normalization.
 
-### Two-tier sample (`select_tiers.py`)
-
-| Tier | Purpose | N | Selection |
-|------|---------|---|-----------|
-| 1 | dev / debug | 40 | stratified by speaker × code-switch, min-len 8 |
-| 2 | **conclusion** | 240 | 8/speaker × 30 speakers, disjoint from tier 1 |
-
 ```bash
 cd tools/eval
-pip install --user -r requirements.txt  # websockets, soundfile, numpy
-pip install --user opencc-python-reimplemented  # optional, for 繁→简
+pip install -r requirements.txt  # websockets, soundfile, numpy, dashscope
 
-python select_tiers.py --tier1 40 --tier2 240 --min-len 8
+# Cascade ASR step 1 — fun-asr-realtime MER on tier2 (n=240)
+python cascade_step1_alt.py \
+    --manifest manifest.tier2.jsonl \
+    --model fun-asr-realtime \
+    --report report.cascade.step1.funasr.tier2.json
 
-# Quick smoke
-python eval.py --manifest manifest.tier1.jsonl --commit-mode manual \
-    --no-realtime --limit 5
-
-# Conclusion run
-python eval.py --manifest manifest.tier2.jsonl --commit-mode manual \
-    --no-realtime --report report.tier2.json
+# Cascade end-to-end latency — joint vs cascade2 on tier1 (n=30)
+python cascade_latency.py \
+    --manifest manifest.tier1.jsonl \
+    --modes joint,cascade2 \
+    --limit 30 \
+    --report report.latency.tier1.n30.refresh.json
 ```
 
-`--commit-mode manual` disables server VAD, pushes the whole clip, then
-issues a single `input_audio_buffer.commit` + `response.create` — this
-eliminates the segment-dropping that server VAD does on long clips.
-`--no-realtime` skips the real-time upload pacing (~5× faster) and is
-fine for accuracy; for latency-faithful runs drop it and use
-`--commit-mode vad`.
-
-### Conclusion: Flash vs Pro (N=240, CS-Dialogue dev)
-
-| | Flash | Pro | Δ |
-|--|------:|----:|---:|
-| **MER mean** | 0.163 | **0.100** | **-0.063 (-39%)** |
-| MER median | 0.095 | **0.045** | -0.049 |
-| CER (zh) | 0.111 | **0.066** | -0.045 |
-| WER (en) | 0.193 | **0.146** | -0.047 |
-| code-switch MER | 0.154 | **0.130** | |
-| pure-Chinese MER | 0.115 | **0.051** | |
-| perfect (MER=0) | 29/240 | **57/240** | |
-| pair-wise | Pro wins 112 · tie 73 · Flash wins 54 | | |
-
-Two Pro-specific failure modes: 6.7% empty outputs (re-runnable
-transients + 2 persistent 6-7s Mandarin clips the model declines to
-transcribe); and a tendency to emit 繁體 Chinese — the harness
-normalizes this via `opencc`, and the transcribe prompt asks for
-simplified explicitly.
-
-Full writeup: `tools/eval/RESULTS.cs_dialogue.md`.
+See `tools/eval/README.md` for the full driver list and
+`tools/eval/REPORT.*.md` for the empirical write-ups.
 
 ## Repo layout
 
 ```
 .
-├── app/                   # Android Studio project (Java)
-│   ├── build.gradle       #   BuildConfig fields from local.properties
+├── app/                         # Android Studio project (Java)
+│   ├── build.gradle             #   BuildConfig fields from local.properties
+│   ├── keystore/vokii-release.jks
 │   └── src/main/java/com/vokii/translator/
-│       ├── AsrEngineFactory.java
-│       ├── ConfigStore.java        # model + key + endpoint
+│       ├── MainActivity.java    #   mic button, transcript card, status dot
 │       ├── SettingsActivity.java
-│       ├── MainActivity.java
 │       ├── TranslationController.java
-│       ├── asr/QwenOmniEngine.java
-│       └── ...
-├── tools/eval/            # ASR-accuracy harness
-│   ├── eval.py            #   main runner
-│   ├── metrics.py         #   MER + latency + rep_rate
-│   ├── qwen_client.py     #   DashScope WS client (mirrors Android)
-│   ├── build_manifest.py  #   CS-Dialogue index → manifest.jsonl
-│   ├── select_tiers.py    #   stratified tier-1 / tier-2 sampling
-│   ├── RESULTS.cs_dialogue.md
-│   ├── report.tier1.manual.json
-│   ├── report.tier1.plus.json
-│   ├── report.tier2.json
-│   └── report.tier2.plus.json
-├── keystore/              # release.jks (see Security notes)
-├── build.gradle           # project-level (AGP + AGCP classpath)
-└── local.properties       # (gitignored) QWEN_API_KEY
+│       ├── AsrEngineFactory.java
+│       ├── ConfigStore.java     #   API key + cascade + debug toggles
+│       ├── CascadeEngine.java   #   ◄── step 1 dispatch + step 2 dispatch
+│       ├── ParaformerAsrClient.java  # ◄── DashScope ASR WebSocket
+│       ├── QwenMtClient.java    #   ◄── qwen-plus chat completion (SSE)
+│       ├── QwenOmniEngine.java  #   joint path (Settings → off)
+│       ├── QwenOmniRealtimeClient.java
+│       ├── AndroidSpeechEngine.java
+│       ├── Bilingual.java       #   ZH/EN route on shared `ZH:`/`EN:` text
+│       ├── Constants.java
+│       ├── DebugLogger.java
+│       └── CrashReporter.java
+├── tools/eval/                  # ASR-accuracy + latency harness
+│   ├── cascade_step1.py         #   cascade ASR score
+│   ├── cascade_step1_alt.py     #   alternate-model A/B (fun-asr vs paraformer)
+│   ├── cascade_step2.py         #   cascade MT score
+│   ├── cascade_compare.py       #   paired win/tie/loss against a baseline
+│   ├── cascade_latency.py       #   joint vs cascade2 TTFB / total / max_delta_gap
+│   ├── eval.py                  #   v1 joint engine eval (pre-cascade)
+│   ├── metrics.py
+│   ├── qwen_client.py
+│   ├── build_manifest.py
+│   ├── select_tiers.py
+│   └── REPORT.*.md              #   empirical write-ups
+├── keystore/                    # (duplicate; app uses ../keystore/vokii-release.jks)
+├── build.gradle                 # project-level (AGP)
+└── local.properties             # (gitignored) QWEN_API_KEY
 ```
 
 ## Security notes
@@ -163,6 +193,11 @@ Full writeup: `tools/eval/RESULTS.cs_dialogue.md`.
 - `app/agconnect-services.json` is gitignored — the AGC debug/release
   SHA-256 fingerprints let anyone with the key push crash/analytics to
   the same AGC project.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md). Latest: **v2.2.0** — cascade as
+default + minimal settings UI.
 
 ## License
 
