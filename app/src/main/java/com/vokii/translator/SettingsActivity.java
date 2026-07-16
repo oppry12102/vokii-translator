@@ -16,15 +16,19 @@ import androidx.appcompat.app.AppCompatActivity;
  * from the defaults baked into BuildConfig:
  *
  *   - API key override (blank → use bundled default from local.properties)
- *   - Endpoint URL (default → DashScope realtime ASR + Qwen-Omni endpoints)
- *   - ASR language hint (default → "zh en")
+ *   - Cascade mode toggle (default ON; off = joint Qwen-Omni Realtime)
  *   - Debug panel visibility
- *   - Cascade mode (Paraformer→qwen-mt-plus opt-in)
  *
  * Intentionally NOT here:
- *   - Model choice — Pro by default; Flash is a fallback if the operator
- *     changes BuildConfig. End users don't pick models.
+ *   - Endpoint URL — qwen (the default) has hardcoded, well-known
+ *     endpoints in the engines themselves; surfacing the URL field
+ *     invites typos and doesn't actually change behaviour for the
+ *     bundled-model paths.
+ *   - Model choice — Pro by default; Flash is a fallback if the
+ *     operator changes BuildConfig. End users don't pick models.
  *   - Temperature — engine picks the optimal value at runtime.
+ *   - ASR language hint — both engines auto-detect; the previous
+ *     "zh en" hint was wired up but never consumed.
  *   - Reset — destructive and rarely needed; if settings break, uninstall
  *     + reinstall restores BuildConfig defaults anyway.
  *
@@ -35,9 +39,7 @@ import androidx.appcompat.app.AppCompatActivity;
 public class SettingsActivity extends AppCompatActivity {
 
     private ConfigStore config;
-    private EditText inputEndpoint;
     private EditText inputApiKey;
-    private EditText inputLang;
     private Switch switchDebug;
     private Switch switchCascade;
     private TextView apiKeyStatus;
@@ -50,16 +52,12 @@ public class SettingsActivity extends AppCompatActivity {
 
         config = new ConfigStore(this);
 
-        inputEndpoint = findViewById(R.id.input_endpoint);
         inputApiKey   = findViewById(R.id.input_api_key);
-        inputLang     = findViewById(R.id.input_asr_lang);
         switchDebug   = findViewById(R.id.switch_debug);
         switchCascade = findViewById(R.id.switch_cascade);
         apiKeyStatus  = findViewById(R.id.api_key_status);
 
         // Load current values into the inputs.
-        inputEndpoint.setText(config.getEndpoint());
-        inputLang.setText(config.getAsrLang());
         switchDebug.setChecked(config.isDebugVisible());
         switchCascade.setChecked(config.isCascadeMode());
 
@@ -97,9 +95,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     /** Persist every editable field, then close the activity. */
     private void persistAndFinish() {
-        config.setEndpoint(inputEndpoint.getText().toString());
         config.setApiKey(inputApiKey.getText().toString());
-        config.setAsrLang(inputLang.getText().toString());
         config.setDebugVisible(switchDebug.isChecked());
         config.setCascadeMode(switchCascade.isChecked());
         refreshApiKeyLabel();

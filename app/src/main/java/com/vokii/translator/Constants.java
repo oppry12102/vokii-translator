@@ -17,21 +17,19 @@ public final class Constants {
     public static final String KEY_MODEL = "model";
     public static final String KEY_API_KEY = "api_key";
     public static final String KEY_TEMPERATURE = "temperature";
-    public static final String KEY_ASR_LANG = "asr_lang";
     public static final String KEY_DEBUG_VISIBLE = "debug_visible";
     public static final String KEY_CASCADE_MODE = "cascade_mode";
 
     /** Default sampling temperature. */
     public static final float DEFAULT_TEMPERATURE = 0.3f;
 
-    /** Default ASR language hint. Both Chinese and English are enabled. */
-    public static final String DEFAULT_ASR_LANG = "zh en";
-
     /** Whether the bottom debug panel is visible by default. */
     public static final boolean DEFAULT_DEBUG_VISIBLE = false;
 
-    /** Whether to use the cascade (Paraformer→qwen-mt-plus) pipeline.
-     *  Default off so existing users keep the joint Qwen-Omni behaviour.
-     *  Toggle from Settings after the v0 ship has been validated on tier2. */
-    public static final boolean DEFAULT_CASCADE_MODE = false;
+    /** Whether to use the cascade (fun-asr-realtime → qwen-plus) pipeline.
+     *  Default ON: tier2 MER cuts 0.1436 → 0.0693 (-52% relative to the
+     *  joint Qwen-Omni path) and median TTFB is 6× faster on tier1
+     *  (cascade_latency.py n=30). Toggle from Settings if the user
+     *  needs to fall back to the joint path. */
+    public static final boolean DEFAULT_CASCADE_MODE = true;
 }

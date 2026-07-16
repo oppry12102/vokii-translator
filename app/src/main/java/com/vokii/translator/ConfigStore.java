@@ -87,14 +87,6 @@ public class ConfigStore {
         prefs.edit().putFloat(Constants.KEY_TEMPERATURE, v).apply();
     }
 
-    public String getAsrLang() {
-        return prefs.getString(Constants.KEY_ASR_LANG, Constants.DEFAULT_ASR_LANG);
-    }
-
-    public void setAsrLang(String v) {
-        prefs.edit().putString(Constants.KEY_ASR_LANG, safe(v, Constants.DEFAULT_ASR_LANG)).apply();
-    }
-
     public boolean isDebugVisible() {
         return prefs.getBoolean(Constants.KEY_DEBUG_VISIBLE, Constants.DEFAULT_DEBUG_VISIBLE);
     }

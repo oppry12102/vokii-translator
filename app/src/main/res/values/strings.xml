@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Vokii</string>
-    <string name="title_settings">LLM Settings</string>
+    <string name="title_settings">Settings</string>
     <string name="hint_speak">Tap the mic to start</string>
     <string name="hint_listening">Listening…</string>
     <string name="hint_thinking">Translating…</string>
@@ -8,16 +8,12 @@
     <string name="label_debug">Debug log</string>
     <string name="action_settings">Settings</string>
     <string name="action_clear">Clear</string>
-    <string name="setting_endpoint">LLM Endpoint URL</string>
     <string name="setting_api_key">DashScope API Key (leave blank to use bundled default)</string>
     <string name="setting_api_key_hint">sk-…</string>
     <string name="setting_api_key_status_default">Using bundled default key</string>
     <string name="setting_api_key_status_user">Using custom key</string>
-    <string name="setting_debug_enabled">Show debug panel</string>
-    <string name="setting_cascade_enabled">Cascade (Paraformer → qwen-mt-plus)</string>
-    <string name="setting_cascade_desc">−52% MER on CS-Dialogue tier2 vs joint. Off = current Qwen-Omni Realtime.</string>
-    <string name="setting_asr_lang">ASR language hint</string>
-    <string name="setting_endpoint_hint">wss://dashscope.aliyuncs.com/api-ws/v1/realtime</string>
+    <string name="setting_debug_enabled">Debug</string>
+    <string name="setting_cascade_enabled">Cascade</string>
     <string name="permission_required">Microphone permission is required.</string>
     <string name="err_recording">Failed to start audio recorder.</string>
     <string name="err_asr_unavailable">On-device ASR unavailable on this device.</string>
