@@ -3,6 +3,8 @@ package com.vokii.translator;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
+import android.view.View;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.text.SimpleDateFormat;
@@ -65,6 +67,55 @@ public class DebugLogger {
         main.post(this::applyToTextView);
     }
 
+    /**
+     * If the TextView is hosted inside a ScrollView, scroll to the bottom
+     * so the most recent line is visible. Safe to call from any thread —
+     * it just posts to main.
+     *
+     * Bug history: without this, new logs appended at the bottom of the
+     * TextView were hidden until the user manually scrolled down, because
+     * the ScrollView stays at its old position. Combined with a small
+     * viewport (~130dp = ~7 lines at 11sp), the user saw only "one new
+     * line" of activity and assumed earlier history was missing.
+     */
+    public void scrollToBottom() {
+        main.post(() -> {
+            if (target == null) return;
+            View parent = (View) target.getParent();
+            if (parent instanceof ScrollView) {
+                ((ScrollView) parent).fullScroll(View.FOCUS_DOWN);
+            }
+        });
+    }
+
+    /**
+     * Scroll to the bottom only if the TextView's content is taller
+     * than the viewport. The naive {@link #scrollToBottom} on every
+     * log append was hiding early history (boot logs) when the panel
+     * was small — a 7-line buffer in a 240dp panel doesn't overflow,
+     * so all 7 lines should be visible at the top, but scroll-to-bottom
+     * would force a scroll that left only the last line in view.
+     *
+     * The check has to run AFTER layout (so getLineCount and
+     * getHeight are valid) — we post to main and check there.
+     */
+    public void scrollToBottomIfOverflow() {
+        main.post(() -> {
+            if (target == null) return;
+            View parent = (View) target.getParent();
+            if (!(parent instanceof ScrollView)) return;
+            ScrollView sv = (ScrollView) parent;
+            target.post(() -> {
+                if (target == null) return;
+                int contentHeight = target.getHeight();
+                int viewHeight = sv.getHeight();
+                if (contentHeight > viewHeight) {
+                    sv.fullScroll(View.FOCUS_DOWN);
+                }
+            });
+        });
+    }
+
     public void clear() {
         synchronized (buffer) {
             buffer.clear();
@@ -116,28 +167,39 @@ public class DebugLogger {
         }
 
         Editable editable = target.getEditableText();
-        // First-ever render: Editable doesn't exist yet, must setText.
-        if (editable == null) {
-            StringBuilder sb = new StringBuilder(pending.length * 80);
-            for (String s : pending) sb.append(s).append('\n');
-            target.setText(sb);
+        // Defensive: if the Editable is missing OR empty (cold start,
+        // post-clear, or any other reason — sometimes Android returns
+        // a fresh empty Editable after layout for reasons we don't
+        // fully understand), rebuild from the FULL buffer rather than
+        // just `pending`. Otherwise we'd wipe out already-applied lines
+        // — the bug we hit on real device where the boot logs vanished
+        // after tapping mic.
+        if (editable == null || editable.length() == 0) {
+            StringBuilder sb = new StringBuilder(total() * 80);
+            synchronized (buffer) {
+                for (String s : buffer) sb.append(s).append('\n');
+            }
+            target.setText(sb, TextView.BufferType.EDITABLE);
             trimFromFront(target);
+            scrollToBottomIfOverflow();
             return;
         }
-        // Cold start (post-clear): Editable exists but is empty.
-        if (editable.length() == 0) {
-            StringBuilder sb = new StringBuilder(pending.length * 80);
-            for (String s : pending) sb.append(s).append('\n');
-            target.setText(sb);
-            trimFromFront(target);
-            return;
-        }
-        // Incremental path: append each pending line in order, one Editable
+        // Normal path: append each new line in order. One Editable
         // mutation per line so a single line never has to be re-measured.
         for (String s : pending) {
             editable.append(s).append('\n');
         }
         trimFromFront(target);
+        // Pin to the bottom so the latest log is always visible — but ONLY
+        // when the buffer is taller than the viewport. Otherwise the
+        // user gets scrolled past history they actually want to see.
+        scrollToBottomIfOverflow();
+    }
+
+    /** Buffer size under the lock. Used by applyToTextView to rebuild
+     *  from the full buffer when we need to. */
+    private int total() {
+        synchronized (buffer) { return buffer.size(); }
     }
 
     /** Trim leading lines so the TextView never holds more than MAX_LINES. */

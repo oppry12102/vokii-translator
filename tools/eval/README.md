@@ -185,7 +185,62 @@ audio — drop in any `.wav` you have to test the tool.
    change). Re-run the same manifest. Diff `baseline.json` vs the new
    `report.json` to see if the change moved the metric you cared about
    without hurting others.
-4. Repeat. Keep the changes that improve, revert the ones that don't.
+4. **Is the eval representative of prod?** Use `audio_diff.py` to score
+   the same manifest with synthetically degraded audio (or, ideally,
+   re-recorded prod audio via `prod_audio:` in a paired manifest). If
+   ΔMER ≥ +0.02, the eval understates what users see — fix the capture
+   pipeline before tuning the model.
+5. Repeat. Keep the changes that improve, revert the ones that don't.
+
+## Sampling knobs you can sweep
+
+Two `eval.py` flags expose session-level knobs the model is willing to
+accept (DashScope may silently ignore unsupported ones):
+
+- `--repetition-penalty 1.05` — gentle anti-stutter. `1.0` = off.
+- `--instructions '…'` — full prompt override. Sentinels:
+  - `v1` (default — best on tier1: avg MER 0.134)
+  - `v2` — 5 strict rules. **Do not use as default**: tier1 A/B showed
+    a +0.025 regression and 1 empty output (see `REPORT.tier1.ab_round1.md`).
+    The "wait for ≥0.5s silence before writing" rule + the "output nothing
+    if unclear" rule combined make the model drop sentence heads and
+    hallucinate substitutions to fill the gap.
+  - `v3` — v1 + the three v2 rules that didn't backfire (ASCII digits /
+    no full-width / no fillers). Worth a tier2 A/B before promotion.
+  - anything else is passed verbatim to the model.
+
+The Android production app uses `v1`-equivalent instructions
+(verified by the tier1 A/B). When you change Android, mirror the same
+sentinel here so apples-to-apples comparisons stay that way.
+
+## Comparing transcription runs (`cascade_compare.py`)
+
+`tools/eval/cascade_compare.py` is the canonical A/B helper for any
+transcription-direction work. It pairs two or more `report.json` files
+(``--baseline``, ``--challenger``) and prints:
+
+- headline summary (avg / median MER, per-language breakdown)
+- per-ref-length MER bucket (≤10 / 10-30 / 30-60 / 60+)
+- pairwise win / tie / loss counts vs the baseline
+- top-K regressions and wins
+- a CSV block that pastes straight into a spreadsheet
+
+This is what produced the cascade-step-1 numbers; example:
+
+```bash
+python cascade_compare.py \
+    --baseline report.tier2.v1.json \
+    --challenger report.cascade.step1.tier2.json
+```
+
+Re-run it after any code change that affects transcription quality
+(model swap, prompt tweak, audio path, paired-recorded audio diff).
+
+The companion runs: `cascade_step1.py` (Paraformer-V2 verbatim ASR
+only) and `cascade_step2.py` (Paraformer-V2 ASR + qwen-plus text MT
+end-to-end). All three keep translation out of scope — transcription
+MER is the only forward-looking metric per the project's optimisation
+target.
 
 ## Notes & gotchas
 

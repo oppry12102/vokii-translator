@@ -81,17 +81,35 @@ def score_one(result: EvalResult, ref_zh: str, ref_en: str) -> dict:
 def score_transcribe(result: EvalResult, ref: str) -> dict:
     """Transcription-task scoring: a single verbatim hypothesis is scored
     against a single mixed reference with Mixed Error Rate (Chinese by
-    char, English by word), plus per-language breakdown."""
+    char, English by word), plus per-language breakdown.
+
+    Empty hypothesis (no text emitted at all) is treated as a hard failure:
+    mer = 1.0 so an empty row shows up red in the summary table instead
+    of being silently folded into the average. The ``is_empty`` flag is
+    also set so the report carries the diagnostic forward.
+    """
     metrics: dict = {}
     _add_latency(metrics, result)
 
-    hyp = result.transcript
+    hyp = result.transcript or ""
+    is_empty = (not hyp.strip()) and not result.error
+    metrics["is_empty"] = is_empty
     if ref:
-        mstats = mixed_error_rate(ref, hyp)
-        metrics["mer"] = mstats.mer
-        metrics["cer_zh"] = mstats.cer_zh if mstats.n_ref_zh else None
-        metrics["wer_en"] = mstats.wer_en if mstats.n_ref_en else None
-        metrics["n_ref_tokens"] = mstats.n_ref_tokens
+        if is_empty:
+            # Empty hypothesis against a non-empty reference: every ref token
+            # is "missing" → MER = 1.0. Without this, the sample drops out
+            # of the average and masks regressions where the model started
+            # declining to commit on short utterances (v2/v3 history).
+            metrics["mer"] = 1.0
+            metrics["cer_zh"] = 1.0 if any(_is_han(c) for c in ref) else None
+            metrics["wer_en"] = 1.0 if any(_is_en_word(c) for c in ref.split()) else None
+            metrics["n_ref_tokens"] = len(ref.split())
+        else:
+            mstats = mixed_error_rate(ref, hyp)
+            metrics["mer"] = mstats.mer
+            metrics["cer_zh"] = mstats.cer_zh if mstats.n_ref_zh else None
+            metrics["wer_en"] = mstats.wer_en if mstats.n_ref_en else None
+            metrics["n_ref_tokens"] = mstats.n_ref_tokens
     else:
         metrics["mer"] = None
         metrics["cer_zh"] = None
@@ -100,6 +118,14 @@ def score_transcribe(result: EvalResult, ref: str) -> dict:
     metrics["error"] = result.error
     metrics["hyp"] = hyp
     return metrics
+
+
+def _is_han(c: str) -> bool:
+    return "一" <= c <= "鿿"
+
+
+def _is_en_word(tok: str) -> bool:
+    return bool(tok) and tok[0].isalpha() and ord(tok[0]) < 128
 
 
 def _add_latency(metrics: dict, result: EvalResult) -> None:
@@ -153,6 +179,8 @@ def print_console_report(samples: List[dict], summary: dict) -> None:
         if k.startswith("avg_") or k in ("avg_delta_gap",):
             label = k.replace("avg_", "")
             print(f"  {label:<22} {v:.3f}")
+        elif k in ("n_samples", "n_errors", "n_empty"):
+            print(f"  {k:<22} {v}")
 
 
 def write_json_report(path: Path, samples: List[dict], summary: dict,
@@ -165,6 +193,26 @@ def write_json_report(path: Path, samples: List[dict], summary: dict,
     }
     path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\nReport written: {path}")
+
+
+def _instructions_label(arg: Optional[str]) -> str:
+    """Stamp a short label in the report so an A/B is attributable. Avoid
+    dumping the full prompt into JSONL every time."""
+    if arg is None:
+        return "default(v1)"
+    from qwen_client import (
+        TRANSCRIBE_INSTRUCTIONS_V1,
+        TRANSCRIBE_INSTRUCTIONS_V2,
+        TRANSCRIBE_INSTRUCTIONS_V3,
+    )
+    if arg == TRANSCRIBE_INSTRUCTIONS_V1:
+        return "v1"
+    if arg == TRANSCRIBE_INSTRUCTIONS_V2:
+        return "v2"
+    if arg == TRANSCRIBE_INSTRUCTIONS_V3:
+        return "v3"
+    head = " ".join(arg.split()[:6])
+    return f"custom:{head}…"
 
 
 # ---------------------------------------------------------------------
@@ -193,9 +241,12 @@ async def run(args: argparse.Namespace) -> int:
         trailing_silence_ms=args.trailing_silence,
         commit_mode=args.commit_mode,
         realtime=not args.no_realtime,
+        instructions=args.instructions,
+        repetition_penalty=args.repetition_penalty,
     )
     print(f"Task: {args.task}  commit_mode={args.commit_mode}  "
-          f"realtime={not args.no_realtime}")
+          f"realtime={not args.no_realtime}  "
+          f"repetition_penalty={args.repetition_penalty}")
 
     per_sample: List[dict] = []
     refs_zh: List[str] = []
@@ -241,7 +292,7 @@ async def run(args: argparse.Namespace) -> int:
 
     # Aggregate.
     sample_metrics = [
-        {k: v for k, v in s.items() if k not in ("id", "error", "hyp", "hyp_zh", "hyp_en")}
+        {k: v for k, v in s.items() if k not in ("id", "error", "hyp", "hyp_zh", "hyp_en", "is_empty")}
         for s in per_sample
     ]
     summary = aggregate(sample_metrics)
@@ -250,6 +301,7 @@ async def run(args: argparse.Namespace) -> int:
         summary["bleu_en"] = bleu_score(refs_en, hyps_en)
     summary["n_samples"] = len(per_sample)
     summary["n_errors"] = sum(1 for s in per_sample if s.get("error"))
+    summary["n_empty"] = sum(1 for s in per_sample if s.get("is_empty"))
 
     print_console_report(per_sample, summary)
 
@@ -259,6 +311,10 @@ async def run(args: argparse.Namespace) -> int:
             config={"model": args.model, "endpoint": args.endpoint,
                     "vad_silence_ms": args.vad_silence,
                     "vad_threshold": args.vad_threshold,
+                    "commit_mode": args.commit_mode,
+                    "task": args.task,
+                    "repetition_penalty": args.repetition_penalty,
+                    "instructions": _instructions_label(args.instructions),
                     "n_samples": len(manifest)},
         )
     return 0
@@ -285,9 +341,30 @@ def main() -> int:
     p.add_argument("--no-realtime", action="store_true",
                    help="don't pace upload at real time — much faster for "
                         "big accuracy runs, but makes latency metrics moot")
+    p.add_argument("--instructions", default=None,
+                   help="session instructions override. Sentinels: "
+                        "'v1' (default — best on tier1), 'v2' (5 strict rules, "
+                        "tier1 +0.025 regression), 'v3' (v1 + rules 1/2/3). "
+                        "Anything else is passed verbatim to the model.")
+    p.add_argument("--repetition-penalty", type=float, default=None,
+                   help="optional sampling knob forwarded to session.update. "
+                        "1.0 = off; try 1.05-1.1 to curb stuck repeats. "
+                        "Server may ignore if unsupported.")
     p.add_argument("--report", default="report.json", help="output JSON path (or empty to skip)")
     p.add_argument("--limit", type=int, default=0, help="only run first N samples (0 = all)")
     args = p.parse_args()
+    # Resolve prompt-version sentinels to literal prompt strings.
+    from qwen_client import (
+        TRANSCRIBE_INSTRUCTIONS_V1,
+        TRANSCRIBE_INSTRUCTIONS_V2,
+        TRANSCRIBE_INSTRUCTIONS_V3,
+    )
+    if args.instructions is None or args.instructions == "v1":
+        args.instructions = TRANSCRIBE_INSTRUCTIONS_V1
+    elif args.instructions == "v2":
+        args.instructions = TRANSCRIBE_INSTRUCTIONS_V2
+    elif args.instructions == "v3":
+        args.instructions = TRANSCRIBE_INSTRUCTIONS_V3
     if args.limit > 0:
         # Pre-truncate the loaded manifest by intercepting load_manifest.
         orig = load_manifest

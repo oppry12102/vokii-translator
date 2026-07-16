@@ -19,6 +19,7 @@ public final class Constants {
     public static final String KEY_TEMPERATURE = "temperature";
     public static final String KEY_ASR_LANG = "asr_lang";
     public static final String KEY_DEBUG_VISIBLE = "debug_visible";
+    public static final String KEY_CASCADE_MODE = "cascade_mode";
 
     /** Default sampling temperature. */
     public static final float DEFAULT_TEMPERATURE = 0.3f;
@@ -28,4 +29,9 @@ public final class Constants {
 
     /** Whether the bottom debug panel is visible by default. */
     public static final boolean DEFAULT_DEBUG_VISIBLE = false;
+
+    /** Whether to use the cascade (Paraformer→qwen-mt-plus) pipeline.
+     *  Default off so existing users keep the joint Qwen-Omni behaviour.
+     *  Toggle from Settings after the v0 ship has been validated on tier2. */
+    public static final boolean DEFAULT_CASCADE_MODE = false;
 }

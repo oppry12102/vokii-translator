@@ -1,0 +1,34 @@
+# Example manifest for audio_diff.py. Replace with your own paths / refs.
+# Schema per line:
+#   { "id":      unique id for this row
+#     "ref":     gold transcript (verbatim code-switch, mixed zh/en)
+#     "clean_audio":   abs path to the original CS-Dialogue wav (or any wav)
+#     "prod_audio":    abs path to the same clip re-recorded through your
+#                       phone (paired mode — recommended)
+#     "degradation":   one of the synthetic degradation names below; used
+#                       only when "prod_audio" is missing (synthetic mode)
+#   }
+#
+# Available synthetic degradations (see audio_diff.py DEGRADATIONS):
+#   none
+#   add_noise_25db | add_noise_20db | add_noise_15db | add_noise_10db
+#   mic_eq_strict                       # telephony 300-3400 Hz bandpass
+#   mic_eq_loose                        # smartphone ~100-7000 Hz bandpass
+#   resample_44k                        # 16→44.1→16 round-trip
+#   mic_eq+noise_20db                   # telephony eq + 20 dB SNR noise
+#   mic_loose+noise_15db+resample       # smartphone eq + 15 dB SNR + resample
+#
+# Recommended first run (no recording needed):
+#
+#   python audio_diff.py \
+#       --manifest manifest.diff.example.jsonl \
+#       --report report.diff.synth.json \
+#       --limit 30
+#
+# Then add real prod recordings by replaying the same clips through your
+# phone speaker into the mic, write a paired manifest, and re-run with
+# no other flag changes.
+
+{"id": "example_zh_only", "ref": "我今天去 office 开 meeting", "clean_audio": "/abs/path/to/cs.wav", "degradation": "mic_loose+noise_15db+resample"}
+{"id": "example_en_only", "ref": "Let's meet at 三点 tomorrow",      "clean_audio": "/abs/path/to/cs2.wav", "degradation": "add_noise_20db"}
+{"id": "example_paired",  "ref": "Um so yeah that's pretty cool",   "clean_audio": "/abs/path/to/cs3.wav", "prod_audio": "/abs/path/to/cs3.prod.wav"}

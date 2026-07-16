@@ -111,11 +111,14 @@
             android:src="@drawable/ic_mic" />
     </FrameLayout>
 
-    <!-- Debug panel (hidden by default; toggled in Settings) -->
+    <!-- Debug panel (hidden by default; toggled in Settings).
+         240dp (was 180dp) gives ~10 visible log lines at 11sp after
+         padding+header — needed when cascade logs 4-5 startup lines
+         before the first MT turn. -->
     <LinearLayout
         android:id="@+id/debug_panel"
         android:layout_width="0dp"
-        android:layout_height="180dp"
+        android:layout_height="240dp"
         android:orientation="vertical"
         android:background="@drawable/bg_debug"
         android:layout_margin="10dp"
@@ -161,7 +164,9 @@
             android:layout_weight="1"
             android:layout_marginTop="4dp"
             android:fillViewport="true"
-            android:scrollbars="vertical">
+            android:scrollbars="vertical"
+            android:scrollbarAlwaysDrawVerticalTrack="true"
+            android:fadeScrollbars="false">
 
             <TextView
                 android:id="@+id/debug_text"

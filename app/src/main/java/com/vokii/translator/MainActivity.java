@@ -57,6 +57,9 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
 
     private AsrEngine asr;
     private TranslationController controller;
+    /** Engine type at last build — used by onResume to detect a Settings
+     *  change that requires recreating the engine (e.g. cascade toggle). */
+    private String currentEngineName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,14 +95,53 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             asr = null;
         }
         controller = new TranslationController(asr, this);
+        currentEngineName = (asr == null ? "null" : asr.name());
 
         debug.log("boot", "endpoint=" + config.getEndpoint());
         debug.log("boot", "model=" + config.getModel());
         debug.log("boot", "api_key=" + (config.getApiKey().isEmpty() ? "EMPTY" : "set"));
         debug.log("boot", "debug_visible=" + config.isDebugVisible());
-        debug.log("boot", "asr_engine=" + (asr == null ? "null" : asr.name()));
+        debug.log("boot", "asr_engine=" + currentEngineName);
 
         setStatus(Status.IDLE, getString(R.string.hint_speak));
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Re-read SharedPreferences after returning from Settings — values
+        // changed there don't reach this Activity otherwise (we read them
+        // once in onCreate).
+        applyDebugVisibility(config.isDebugVisible());
+        reconcileEngineIfNeeded();
+    }
+
+    /** If the user changed cascade_mode in Settings while we were paused,
+     *  tear down the old engine and build a new one so the next mic tap
+     *  picks the right pipeline. No-op if nothing changed. */
+    private void reconcileEngineIfNeeded() {
+        if (controller == null) return;
+        if (controller.isActive()) {
+            // Don't hot-swap while listening — the user would lose audio.
+            // They'll get the new engine on the next start.
+            return;
+        }
+        String desiredName = config.isCascadeMode()
+                ? "Cascade(Paraformer→qwen-mt-plus)"
+                : "QwenOmniRealtime";
+        if (desiredName.equals(currentEngineName)) return;
+        debug.log("engine", "rebuilding: " + currentEngineName + " -> " + desiredName);
+        AsrEngine fresh;
+        try {
+            fresh = AsrEngineFactory.create(this, config, debug);
+        } catch (Throwable t) {
+            debug.log("engine", "rebuild failed: " + t);
+            return;
+        }
+        asr = fresh;
+        controller = new TranslationController(asr, this);
+        currentEngineName = asr.name();
+        debug.log("engine", "now running " + currentEngineName);
     }
 
     @Override
@@ -111,6 +153,9 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private void applyDebugVisibility(boolean visible) {
         debugPanel.setVisibility(visible ? View.VISIBLE : View.GONE);
     }
+
+    // applyDebugVisibility already idempotent — exposed package-private via
+    // the public method above for clarity.
 
     private void toggleListening() {
         if (controller != null && controller.isActive()) {

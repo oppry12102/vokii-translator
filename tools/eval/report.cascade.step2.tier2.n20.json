@@ -1,0 +1,191 @@
+{
+  "config": {
+    "asr_model": "paraformer-realtime-v2",
+    "mt_model": "qwen-plus",
+    "manifest": "manifest.tier2.jsonl",
+    "n_items": 20
+  },
+  "samples": [
+    {
+      "id": "ZH-CN_U0023_S0_382",
+      "ref": "They're like so tempered, and they just don't know how to.",
+      "step1_verbatim": "They're like so pampered and they just don't know how to.",
+      "step1_elapsed_s": 1.795,
+      "step2_zh": "他们就像被宠坏了，根本不知道该怎么（做）。",
+      "step2_en": "They're like so pampered and they just don't know how to.",
+      "step2_raw": "ZH: 他们就像被宠坏了，根本不知道该怎么（做）。\nEN: They're like so pampered and they just don't know how to."
+    },
+    {
+      "id": "ZH-CN_U0024_S0_357",
+      "ref": "So um are you currently？",
+      "step1_verbatim": "So. Are you currently.",
+      "step1_elapsed_s": 1.604,
+      "step2_zh": "所以。你目前是。",
+      "step2_en": "So. Are you currently.",
+      "step2_raw": "ZH: 所以。你目前是。  \nEN: So. Are you currently."
+    },
+    {
+      "id": "ZH-CN_U0025_S0_182",
+      "ref": "对，是的是的，还有一些比较嗯像那个看啊看理想，他就是可可能更偏 serous 一些，会讨论一些社会话题。但是他们 这个 company 还有一个嗯博客，是应该是他们的 editors ，嗯，聊天的一个博客，就是没理想编辑部。嗯，我还蛮喜欢听这个的，也是比较 relax。",
+      "step1_verbatim": "对，是的是的，还有一些比较嗯像那个看嗯看理想，他就是可能更偏series一些，会讨论一些社会话题。但是他们呃这个company还有一个嗯博客是应该是他们的editors。嗯，聊天的一个博客，就是没理想编辑部。嗯，我还蛮喜欢听这个的，也是比较relax。",
+      "step1_elapsed_s": 7.658,
+      "step2_zh": "对，是的，是的，还有一些比较……嗯，像那个“看理想”，它可能更偏向系列节目一些，会讨论一些社会话题。但是他们呃，这家公司还有一个嗯，博客，应该是他们的编辑们聊天的一个博客，叫“没理想编辑部”。嗯，我还蛮喜欢听这个的，也比较轻松。",
+      "step2_en": "Yes, that’s right, yes, there are also some others—um, like “See Ideal,” which may lean more toward series-style content and discuss social topics. But, uh, this company also has, um, a blog—probably where their editors chat—called “The Unideal Editorial Department.” Um, I quite enjoy listening to it; it’s also quite relaxed.",
+      "step2_raw": "ZH: 对，是的，是的，还有一些比较……嗯，像那个“看理想”，它可能更偏向系列节目一些，会讨论一些社会话题。但是他们呃，这家公司还有一个嗯，博客，应该是他们的编辑们聊天的一个博客，叫“没理想编辑部”。嗯，我还蛮喜欢听这个的，也比较轻松。\nEN: Yes, that’s right, yes, there are also some others—um, like “See Ideal,” which may lean more toward series-style content and discuss social topics. But, uh, this company also has, um, a blog—probably where their editors chat—called “The Unideal Editorial Department.” Um, I quite enjoy listening to it; it’s also quite relaxed."
+    },
+    {
+      "id": "ZH-CN_U0026_S0_101",
+      "ref": "Um so, yeah, that's pretty cool. That's fantastic.",
+      "step1_verbatim": "So Yeah, that's pretty cool. That's fantastic.",
+      "step1_elapsed_s": 1.382,
+      "step2_zh": "所以，是的，这相当酷。这太棒了。",
+      "step2_en": "So Yeah, that's pretty cool. That's fantastic.",
+      "step2_raw": "ZH: 所以，是的，这相当酷。这太棒了。\nEN: So Yeah, that's pretty cool. That's fantastic."
+    },
+    {
+      "id": "ZH-CN_U0035_S0_66",
+      "ref": "嗯，明白，但是 public management 是一个非常有意思的话题。你看像我们 最近几年 疫情期间请大家 就是都需要对吧？集中去到 一个地方。那实际上面这些可能都是跟你的这个专业是非常有关联的哦。所以我觉得说 你在这方面的专长是可以服务到 很多人的。所以 会不会是说比如说 你你可以去去找一些 government service industry 去尝试一下这个方向呢？",
+      "step1_verbatim": "嗯，明白，但是public management是一个非常有意思的话题。你看像我们嗯最近几年呃疫情期间，请大家嗯就是都需要对吧集中去到呃一个地方。那实际上面这些可能都是跟你的这个专业是非常有关联的哦。所以我觉得说嗯你在这方面的专长是可以服务到呃很多人的。所以呃会不会是说比如说嗯你你可以去去找一些government呃service industry呃去尝试一下这个方向呢？",
+      "step1_elapsed_s": 12.081,
+      "step2_zh": "嗯，明白，但是公共管理是一个非常有意思的话题。你看，像我们最近几年，呃，疫情期间，请大家，嗯，就是都需要对吧，集中去到，呃，一个地方。那实际上这些可能都跟你的这个专业是非常有关联的哦。所以我觉得说，嗯，你在这方面的专长是可以服务到，呃，很多人的。所以，呃，会不会是说，比如说，嗯，你可以去找一些政府或服务业去尝试一下这个方向呢？",
+      "step2_en": "Hmm, understood—but public management is a very interesting topic. For example, during the past few years, especially the pandemic period, everyone was required—well, you know—to gather together in one place. In fact, these situations are highly relevant to your field of expertise. So I think your expertise in this area can serve many people. So, could it be possible—for instance—that you might explore opportunities in government or the service industry?",
+      "step2_raw": "ZH: 嗯，明白，但是公共管理是一个非常有意思的话题。你看，像我们最近几年，呃，疫情期间，请大家，嗯，就是都需要对吧，集中去到，呃，一个地方。那实际上这些可能都跟你的这个专业是非常有关联的哦。所以我觉得说，嗯，你在这方面的专长是可以服务到，呃，很多人的。所以，呃，会不会是说，比如说，嗯，你可以去找一些政府或服务业去尝试一下这个方向呢？  \nEN: Hmm, understood—but public management is a very interesting topic. For example, during the past few years, especially the pandemic period, everyone was required—well, you know—to gather together in one place. In fact, these situations are highly relevant to your field of expertise. So I think your expertise in this area can serve many people. So, could it be possible—for instance—that you might explore opportunities in government or the service industry?"
+    },
+    {
+      "id": "ZH-CN_U0036_S0_189",
+      "ref": "那姐姐你现在是不是会经常 rememorize 你的 uh school life many years ago。",
+      "step1_verbatim": "那姐姐你现在是不是会经常呃remember orize你的呃school life many years ago。",
+      "step1_elapsed_s": 3.332,
+      "step2_zh": "那姐姐你现在是不是会经常呃回忆起你很多年前的校园生活？",
+      "step2_en": "So, sis, do you now often, uh, remember or reminisce about your school life many years ago?",
+      "step2_raw": "ZH: 那姐姐你现在是不是会经常呃回忆起你很多年前的校园生活？\nEN: So, sis, do you now often, uh, remember or reminisce about your school life many years ago?"
+    },
+    {
+      "id": "ZH-CN_U0049_S0_64",
+      "ref": "Yes, team buildings is I think it is useful tool for us to gather together. But when I was learning undergraduate degree, it was a pandemic pandemic period. So it is rare for us to do this kind of team building activities. But we did for several times. We may go to take a break take a lunch together or drink some wine in order to get a better communication.",
+      "step1_verbatim": "Yes, team buildings is a. I think it is a useful tool for us to gather together. But when I was learning undergraduate degree, it was a pandemic period. So it is rare for us to. Do this kind of team building activities, but we did for several times. We may go to take a break, take a lunch together or drink some wine in order to get a better communication.",
+      "step1_elapsed_s": 12.682,
+      "step2_zh": "是的，团队建设是一种。我认为这是我们聚集在一起的有用工具。但我在本科阶段学习时正值疫情时期，因此我们很少开展这类团队建设活动，不过也进行过几次。我们可能会一起休息、共进午餐或喝点酒，以促进更好的沟通。",
+      "step2_en": "Yes, team building is a. I think it is a useful tool for us to gather together. But when I was learning undergraduate degree, it was a pandemic period. So it is rare for us to do this kind of team building activities, but we did for several times. We may go to take a break, take a lunch together or drink some wine in order to get a better communication.",
+      "step2_raw": "ZH: 是的，团队建设是一种。我认为这是我们聚集在一起的有用工具。但我在本科阶段学习时正值疫情时期，因此我们很少开展这类团队建设活动，不过也进行过几次。我们可能会一起休息、共进午餐或喝点酒，以促进更好的沟通。\nEN: Yes, team building is a. I think it is a useful tool for us to gather together. But when I was learning undergraduate degree, it was a pandemic period. So it is rare for us to do this kind of team building activities, but we did for several times. We may go to take a break, take a lunch together or drink some wine in order to get a better communication."
+    },
+    {
+      "id": "ZH-CN_U0050_S0_119",
+      "ref": "这我我觉得自己自己去定会不会是一个挺耗时的过程。你怎么去 search 这些信息，你会觉得它是一个比较耗时，比较 浪费时间或者繁琐的事情吗？",
+      "step1_verbatim": "就我我觉得自己自己去定会不会是一个挺耗时的过程，你怎么去search置这些信息？你会觉得他是一个比较耗时，比较嗯浪费时间或者繁琐的事情嘛。",
+      "step1_elapsed_s": 4.282,
+      "step2_zh": "我觉得独自确定这些信息可能是一个相当耗时的过程，你如何搜索这些信息？你觉得这是一件比较耗时、浪费时间或繁琐的事情吗？",
+      "step2_en": "I think determining this information on my own might be quite time-consuming. How do you search for this information? Do you find it time-consuming, wasteful of time, or tedious?",
+      "step2_raw": "ZH: 我觉得独自确定这些信息可能是一个相当耗时的过程，你如何搜索这些信息？你觉得这是一件比较耗时、浪费时间或繁琐的事情吗？\nEN: I think determining this information on my own might be quite time-consuming. How do you search for this information? Do you find it time-consuming, wasteful of time, or tedious?"
+    },
+    {
+      "id": "ZH-CN_U0059_S0_459",
+      "ref": "That is also nice, but may be better equip when equipped with some exercise like you said.",
+      "step1_verbatim": "Oh, that is also nice, but maybe better equiwhen equipped with some exercise, like you said.",
+      "step1_elapsed_s": 2.613,
+      "step2_zh": "哦，那也很不错，但也许配上一些锻炼会更好，就像你刚才说的那样。",
+      "step2_en": "Oh, that is also nice, but maybe better when equipped with some exercise, like you said.",
+      "step2_raw": "ZH: 哦，那也很不错，但也许配上一些锻炼会更好，就像你刚才说的那样。  \nEN: Oh, that is also nice, but maybe better when equipped with some exercise, like you said."
+    },
+    {
+      "id": "ZH-CN_U0060_S0_432",
+      "ref": "No, I don't exercise. I just stay home and eat many food.",
+      "step1_verbatim": "No, I no exercise, I just stay at home and eat many food.",
+      "step1_elapsed_s": 2.041,
+      "step2_zh": "不，我不锻炼，我只待在家里吃很多食物。",
+      "step2_en": "No, I don’t exercise; I just stay at home and eat a lot of food.",
+      "step2_raw": "ZH: 不，我不锻炼，我只待在家里吃很多食物。\nEN: No, I don’t exercise; I just stay at home and eat a lot of food."
+    },
+    {
+      "id": "ZH-CN_U0061_S0_530",
+      "ref": "You serve yourself. Yeah, but actually I haven't said that.",
+      "step1_verbatim": "Use every yourself. Yeah. But I actually haven't said that.",
+      "step1_elapsed_s": 1.6,
+      "step2_zh": "用好你自己。是的。但我实际上还没说过那句话。",
+      "step2_en": "Use every yourself. Yeah. But I actually haven't said that.",
+      "step2_raw": "ZH: 用好你自己。是的。但我实际上还没说过那句话。\nEN: Use every yourself. Yeah. But I actually haven't said that."
+    },
+    {
+      "id": "ZH-CN_U0062_S0_715",
+      "ref": "Wow , uh do do you want to uh do you have any idea to go to Japan to travel?",
+      "step1_verbatim": "哇。Yeah, do do you want to do you have any idea to go to Japan to travel?",
+      "step1_elapsed_s": 2.695,
+      "step2_zh": "哇。是的，你想要去日本旅行吗？你有什么想法吗？",
+      "step2_en": "Wow. Yeah, do you want to go to Japan to travel? Do you have any ideas?",
+      "step2_raw": "ZH: 哇。是的，你想要去日本旅行吗？你有什么想法吗？\nEN: Wow. Yeah, do you want to go to Japan to travel? Do you have any ideas?"
+    },
+    {
+      "id": "ZH-CN_U0063_S0_562",
+      "ref": "That's good. I don't have this have to to do it. I know it, uh advantage, but sometimes it's I I I don't do it.",
+      "step1_verbatim": "That's good. I don't have this have that to to do it. I know it advantage, but sometimes it's. I don't have to wait.",
+      "step1_elapsed_s": 3.982,
+      "step2_zh": "这很好。我没有这个，也没有那个去做它。我知道它的优势，但有时候它不是这样。我不必等待。",
+      "step2_en": "That's good. I don't have this, nor that, to do it. I know its advantage, but sometimes it's not. I don't have to wait.",
+      "step2_raw": "ZH: 这很好。我没有这个，也没有那个去做它。我知道它的优势，但有时候它不是这样。我不必等待。\nEN: That's good. I don't have this, nor that, to do it. I know its advantage, but sometimes it's not. I don't have to wait."
+    },
+    {
+      "id": "ZH-CN_U0064_S0_456",
+      "ref": "But it's okay, because it's government's job , let's the government to solve it. But network is somehow a good. The thing to our job, like a send emails, to boss or talk with them or video video talk video media, that is something good. I think.",
+      "step1_verbatim": "But it's okay because it's government's job. Less government to solve it. But network is somehow a good thing to our job, like a send emails. Two balls or. Talk with them or video o talk. We will meet you. That is something good, I think.",
+      "step1_elapsed_s": 6.935,
+      "step2_zh": "但没关系，因为这是政府的职责。减少政府干预来解决它。但网络在某种程度上对我们的工作很有帮助，比如发送电子邮件。两个球或者……和他们交谈，或者视频通话。我们会与您见面。我认为这是一件好事。",
+      "step2_en": "But it's okay because it's the government's job. Less government involvement to solve it. But the internet is somehow a good thing for our work, like sending emails. Two balls or... talking with them or video talk. We will meet you. That is something good, I think.",
+      "step2_raw": "ZH: 但没关系，因为这是政府的职责。减少政府干预来解决它。但网络在某种程度上对我们的工作很有帮助，比如发送电子邮件。两个球或者……和他们交谈，或者视频通话。我们会与您见面。我认为这是一件好事。\nEN: But it's okay because it's the government's job. Less government involvement to solve it. But the internet is somehow a good thing for our work, like sending emails. Two balls or... talking with them or video talk. We will meet you. That is something good, I think."
+    },
+    {
+      "id": "ZH-CN_U0081_S0_223",
+      "ref": "But I I notice that 就是现在有一些软件儿，它不光是做动画，因为做动画它只能生成大概 four minutes video. It can not 生成更长的视频。但是它可能用一些线稿儿 to produce some 就是一些 模型。",
+      "step1_verbatim": "But I. I noticed that嗯就是现在有一些软件，它不光是做动画，因为做动画它只能生成大概four minutes video，it can not生成更长的视频。但是它可能用一些线稿啊，to produce some就是些模型。",
+      "step1_elapsed_s": 7.652,
+      "step2_zh": "但我注意到，嗯，就是现在有一些软件，它不光是做动画，因为做动画它只能生成大概四分钟的视频，无法生成更长的视频。但它可能用一些线稿来生成一些模型。",
+      "step2_en": "But I noticed that, um, there are now some software tools that do more than just animation—because for animation, they can only generate roughly a four-minute video; they cannot generate longer videos. However, they might use some line drawings to produce certain models.",
+      "step2_raw": "ZH: 但我注意到，嗯，就是现在有一些软件，它不光是做动画，因为做动画它只能生成大概四分钟的视频，无法生成更长的视频。但它可能用一些线稿来生成一些模型。\nEN: But I noticed that, um, there are now some software tools that do more than just animation—because for animation, they can only generate roughly a four-minute video; they cannot generate longer videos. However, they might use some line drawings to produce certain models."
+    },
+    {
+      "id": "ZH-CN_U0082_S0_189",
+      "ref": "But for the animation company 他们呢是需要一个形象一个 image。 然后呢为了简便他们做动画的过程。They transfer it to three D so it's a little different。",
+      "step1_verbatim": "But for the animation company Taman呢，是需要一个形象，一个image。然后呢为了简便他们做动画的过程，they transfer it to 3D so it's a little different.",
+      "step1_elapsed_s": 4.132,
+      "step2_zh": "但对于动画公司Taman来说，需要一个形象，一个图像。然后为了简化他们的动画制作过程，他们将其转换为3D，因此略有不同。",
+      "step2_en": "But for the animation company Taman, they need an image—a visual representation. Then, to simplify their animation process, they convert it to 3D, so it’s a bit different.",
+      "step2_raw": "ZH: 但对于动画公司Taman来说，需要一个形象，一个图像。然后为了简化他们的动画制作过程，他们将其转换为3D，因此略有不同。\nEN: But for the animation company Taman, they need an image—a visual representation. Then, to simplify their animation process, they convert it to 3D, so it’s a bit different."
+    },
+    {
+      "id": "ZH-CN_U1003_S0_141",
+      "ref": "哦，that's amazing。那确实我感觉有点 就是 interesting, 但是 就是有点遗憾吧。毕竟 之前也是一直就是文科相关的学习嘛。我对，就是这个 architecture 相关的 相关的这些 knowledge 啊，还有 information 啊， 还有 ** 了解的确实不是很多。所以就是我想请你就是 please give us some introduction of your major。 可以吗？就就是简单介绍一下相关的课程，或者是一些就是你的就业前景啊，都可以。",
+      "step1_verbatim": "呃，that's amazing. 那确实我感觉有点就是interesting，但是就是有点遗憾吧，毕竟之前也是一直就是文科相关的学习嘛，我对就是这个architecture相关的关的这些knowledge啊，还有information啊啊了解的确实不是很多。所以就是我想请你，就是please give us introduction of your major。可以吗？就是简单的介绍一下相关的课程或者是一些。就是你的就业前景嘛都可以。",
+      "step1_elapsed_s": 10.173,
+      "step2_zh": "呃，那太棒了。那确实我感觉有点有趣，但又有点遗憾，毕竟之前一直学的都是文科相关的内容，我对建筑学相关的这些知识和信息了解得确实不多。所以我想请你简单介绍一下你的专业，可以吗？比如相关的课程，或者就业前景之类的都可以。",
+      "step2_en": "Uh, that's amazing. That’s indeed interesting to me, but also somewhat regrettable, since I’ve always studied humanities-related subjects before—I really don’t know much about architecture-related knowledge and information. So, could you please give us an introduction to your major? Just a brief overview—such as relevant courses or even your career prospects—would be great.",
+      "step2_raw": "ZH: 呃，那太棒了。那确实我感觉有点有趣，但又有点遗憾，毕竟之前一直学的都是文科相关的内容，我对建筑学相关的这些知识和信息了解得确实不多。所以我想请你简单介绍一下你的专业，可以吗？比如相关的课程，或者就业前景之类的都可以。\nEN: Uh, that's amazing. That’s indeed interesting to me, but also somewhat regrettable, since I’ve always studied humanities-related subjects before—I really don’t know much about architecture-related knowledge and information. So, could you please give us an introduction to your major? Just a brief overview—such as relevant courses or even your career prospects—would be great."
+    },
+    {
+      "id": "ZH-CN_U1004_S0_288",
+      "ref": "About sports. So I do sport about tall twice a week or three times a week. And my favorite sport is jogging. You know, I like, I enjoy the expe the experience of running from my home on the street to the park on the east. And I turn back turn and I turn back in. I often ** spend two or three hours once in in my jogging. So what what's your favorite sport? And how how often do you exercise?",
+      "step1_verbatim": "About sports. So I do sport about twice a week or three times a week. And my favorite spot is jogging. You know, I like I enjoy the experience of running from my home on the street to the park on the east. And I back. Turn and I turn back, I'll often spend. Two or three hours once in in my jogging. So what what's your favorite sport and how how often do you exercise?",
+      "step1_elapsed_s": 11.618,
+      "step2_zh": "关于运动。我每周运动大约两到三次。我最喜欢的运动是慢跑。你知道，我喜欢从我家出发，沿着街道跑到东边的公园，然后再跑回来的这种体验。我经常一次慢跑花费两到三个小时。那么，你最喜欢的运动是什么？你多久锻炼一次？",
+      "step2_en": "About sports. So I do sport about twice a week or three times a week. And my favorite sport is jogging. You know, I like I enjoy the experience of running from my home on the street to the park on the east. And I back. Turn and I turn back, I'll often spend two or three hours once in my jogging. So what's your favorite sport and how often do you exercise?",
+      "step2_raw": "ZH: 关于运动。我每周运动大约两到三次。我最喜欢的运动是慢跑。你知道，我喜欢从我家出发，沿着街道跑到东边的公园，然后再跑回来的这种体验。我经常一次慢跑花费两到三个小时。那么，你最喜欢的运动是什么？你多久锻炼一次？\nEN: About sports. So I do sport about twice a week or three times a week. And my favorite sport is jogging. You know, I like I enjoy the experience of running from my home on the street to the park on the east. And I back. Turn and I turn back, I'll often spend two or three hours once in my jogging. So what's your favorite sport and how often do you exercise?"
+    },
+    {
+      "id": "ZH-CN_U1007_S0_160",
+      "ref": "而且对于我们这些专业的 English major 学生，就是感觉没有什么出路，就是可能更加适合就是去到一些 big city，找一些什么 good job，有没有这种 feeling 呢？",
+      "step1_verbatim": "而且对于我们这些专业的English major学生，就是感觉没有什么出路。就是可能更加适合就是去到一些big city，找一些什么good job。有没有这种feeling呢？",
+      "step1_elapsed_s": 3.952,
+      "step2_zh": "而且对于我们这些专业的英语专业学生来说，就是感觉没有什么出路。可能更适合去一些大城市，找一些好工作。有没有这种感觉呢？",
+      "step2_en": "Moreover, for us English majors, it just feels like there’s no clear career path. We might be better off going to big cities to land good jobs. Do you share this feeling?",
+      "step2_raw": "ZH: 而且对于我们这些专业的英语专业学生来说，就是感觉没有什么出路。可能更适合去一些大城市，找一些好工作。有没有这种感觉呢？  \nEN: Moreover, for us English majors, it just feels like there’s no clear career path. We might be better off going to big cities to land good jobs. Do you share this feeling?"
+    },
+    {
+      "id": "ZH-CN_U1008_S0_9",
+      "ref": "How how about you?",
+      "step1_verbatim": "How how about you?",
+      "step1_elapsed_s": 0.87,
+      "step2_zh": "你呢？",
+      "step2_en": "How about you?",
+      "step2_raw": "ZH: 你呢？  \nEN: How about you?"
+    }
+  ],
+  "generated_at": "2026-07-16T05:10:17"
+}

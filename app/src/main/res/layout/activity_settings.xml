@@ -39,37 +39,6 @@
             android:inputType="textUri"
             android:autofillHints="" />
 
-        <!-- Model selector (Flash / Pro) -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="@string/setting_model"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
-
-        <RadioGroup
-            android:id="@+id/model_group"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:orientation="vertical">
-
-            <RadioButton
-                android:id="@+id/model_flash"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/setting_model_flash"
-                android:textColor="@color/text_primary" />
-
-            <RadioButton
-                android:id="@+id/model_pro"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/setting_model_pro"
-                android:textColor="@color/text_primary" />
-        </RadioGroup>
-
         <!-- API key -->
         <TextView
             android:layout_width="wrap_content"
@@ -96,24 +65,6 @@
             android:layout_marginTop="4dp"
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
-
-        <!-- Temperature -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="@string/setting_temperature"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
-
-        <EditText
-            android:id="@+id/input_temperature"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_secondary"
-            android:inputType="numberDecimal"
-            android:autofillHints="" />
 
         <!-- ASR language hint -->
         <TextView
@@ -156,29 +107,43 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <!-- Buttons -->
+        <!-- Cascade mode (Paraformer + qwen-mt-plus, opt-in) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/btn_reset"
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:text="@string/setting_reset" />
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/btn_save"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginStart="6dp"
-                android:text="@string/setting_save" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_cascade_enabled"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/setting_cascade_desc"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/switch_cascade"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
         </LinearLayout>
+
+        <!-- No Save / Reset buttons. Settings auto-persist on back press. -->
 
     </LinearLayout>
 </ScrollView>

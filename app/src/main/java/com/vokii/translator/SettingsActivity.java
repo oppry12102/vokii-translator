@@ -2,33 +2,44 @@ package com.vokii.translator;
 
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.widget.Button;
 import android.widget.EditText;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 
 /**
- * LLM configuration. The model radio group selects between DeepSeek V4
- * Flash and Pro (default Flash). The API key field starts blank — we
- * never display the bundled default value; if the user leaves it empty,
- * the app silently uses the BuildConfig default at runtime.
+ * Persisted-user-overrides screen. Settings auto-save when the user
+ * navigates back — there is no explicit Save button. The settings that
+ * exist here are only those the user can legitimately want to change
+ * from the defaults baked into BuildConfig:
+ *
+ *   - API key override (blank → use bundled default from local.properties)
+ *   - Endpoint URL (default → DashScope realtime ASR + Qwen-Omni endpoints)
+ *   - ASR language hint (default → "zh en")
+ *   - Debug panel visibility
+ *   - Cascade mode (Paraformer→qwen-mt-plus opt-in)
+ *
+ * Intentionally NOT here:
+ *   - Model choice — Pro by default; Flash is a fallback if the operator
+ *     changes BuildConfig. End users don't pick models.
+ *   - Temperature — engine picks the optimal value at runtime.
+ *   - Reset — destructive and rarely needed; if settings break, uninstall
+ *     + reinstall restores BuildConfig defaults anyway.
+ *
+ * All edits are applied immediately on back press (or any exit) via
+ * {@link OnBackPressedCallback}, so there is no "you forgot to save"
+ * failure mode.
  */
 public class SettingsActivity extends AppCompatActivity {
 
     private ConfigStore config;
     private EditText inputEndpoint;
     private EditText inputApiKey;
-    private RadioGroup modelGroup;
-    private RadioButton modelFlash;
-    private RadioButton modelPro;
-    private EditText inputTemp;
     private EditText inputLang;
     private Switch switchDebug;
+    private Switch switchCascade;
     private TextView apiKeyStatus;
 
     @Override
@@ -39,81 +50,60 @@ public class SettingsActivity extends AppCompatActivity {
 
         config = new ConfigStore(this);
 
-        inputEndpoint  = findViewById(R.id.input_endpoint);
-        inputApiKey    = findViewById(R.id.input_api_key);
-        modelGroup     = findViewById(R.id.model_group);
-        modelFlash     = findViewById(R.id.model_flash);
-        modelPro       = findViewById(R.id.model_pro);
-        inputTemp      = findViewById(R.id.input_temperature);
-        inputLang      = findViewById(R.id.input_asr_lang);
-        switchDebug    = findViewById(R.id.switch_debug);
-        apiKeyStatus   = findViewById(R.id.api_key_status);
+        inputEndpoint = findViewById(R.id.input_endpoint);
+        inputApiKey   = findViewById(R.id.input_api_key);
+        inputLang     = findViewById(R.id.input_asr_lang);
+        switchDebug   = findViewById(R.id.switch_debug);
+        switchCascade = findViewById(R.id.switch_cascade);
+        apiKeyStatus  = findViewById(R.id.api_key_status);
 
+        // Load current values into the inputs.
         inputEndpoint.setText(config.getEndpoint());
-        inputTemp.setText(String.valueOf(config.getTemperature()));
         inputLang.setText(config.getAsrLang());
         switchDebug.setChecked(config.isDebugVisible());
-
-        // Pre-select the model radio based on the current model id.
-        selectModelRadio(config.getModel());
+        switchCascade.setChecked(config.isCascadeMode());
 
         // API key: blank by default to avoid revealing the bundled value.
         // Show the user's own value if they've previously typed one.
         String existing = config.getApiKeyForUi();
-        if (!TextUtils.isEmpty(existing) && !existing.equals(BuildConfig.DEFAULT_QWEN_API_KEY)) {
+        if (!TextUtils.isEmpty(existing)
+                && !existing.equals(BuildConfig.DEFAULT_QWEN_API_KEY)) {
             inputApiKey.setText(existing);
         }
         refreshApiKeyLabel();
 
-        Button btnSave  = findViewById(R.id.btn_save);
-        Button btnReset = findViewById(R.id.btn_reset);
-
-        btnSave.setOnClickListener(v -> save());
-        btnReset.setOnClickListener(v -> reset());
+        // Auto-save on back press. Replaces the old "Save" button.
+        // We register a callback (AndroidX back dispatcher) rather than
+        // overriding onBackPressed() — the dispatcher is the modern path
+        // and works correctly with predictive-back gestures.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() {
+                persistAndFinish();
+            }
+        });
     }
 
-    private void selectModelRadio(String model) {
-        if (BuildConfig.QWEN_MODEL_PLUS.equals(model)) {
-            modelPro.setChecked(true);
-        } else {
-            // Flash for anything else (incl. blank, custom). Users can
-            // downgrade if Pro's 2x latency or higher API cost is unwelcome.
-            modelFlash.setChecked(true);
-        }
+    /** Also handle the toolbar back arrow. AppCompatActivity's default
+     *  onSupportNavigateUp() calls finish() directly, bypassing the
+     *  OnBackPressedDispatcher — so a user who taps the toolbar arrow
+     *  instead of pressing the system Back key would lose their settings
+     *  changes. This override routes both paths through persistAndFinish.
+     */
+    @Override
+    public boolean onSupportNavigateUp() {
+        persistAndFinish();
+        return true;
     }
 
-    private String readSelectedModel() {
-        int id = modelGroup.getCheckedRadioButtonId();
-        if (id == R.id.model_pro) return BuildConfig.QWEN_MODEL_PLUS;
-        return BuildConfig.QWEN_MODEL_FLASH;
-    }
-
-    private void reset() {
-        config.reset();
-        inputEndpoint.setText(BuildConfig.DEFAULT_QWEN_ENDPOINT);
-        selectModelRadio(BuildConfig.QWEN_MODEL_PLUS);
-        inputApiKey.setText("");
-        inputTemp.setText(String.valueOf(Constants.DEFAULT_TEMPERATURE));
-        inputLang.setText(Constants.DEFAULT_ASR_LANG);
-        switchDebug.setChecked(Constants.DEFAULT_DEBUG_VISIBLE);
-        refreshApiKeyLabel();
-        Toast.makeText(this, R.string.setting_reset_done, Toast.LENGTH_SHORT).show();
-    }
-
-    private void save() {
+    /** Persist every editable field, then close the activity. */
+    private void persistAndFinish() {
         config.setEndpoint(inputEndpoint.getText().toString());
-        config.setModel(readSelectedModel());
         config.setApiKey(inputApiKey.getText().toString());
-        try {
-            float t = Float.parseFloat(inputTemp.getText().toString());
-            config.setTemperature(t);
-        } catch (NumberFormatException ignored) {
-            config.setTemperature(Constants.DEFAULT_TEMPERATURE);
-        }
         config.setAsrLang(inputLang.getText().toString());
         config.setDebugVisible(switchDebug.isChecked());
+        config.setCascadeMode(switchCascade.isChecked());
         refreshApiKeyLabel();
-        Toast.makeText(this, R.string.setting_saved, Toast.LENGTH_SHORT).show();
+        finish();
     }
 
     private void refreshApiKeyLabel() {

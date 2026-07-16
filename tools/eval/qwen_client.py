@@ -122,7 +122,21 @@ class EvalResult:
 
 # Session instructions per task. 'transcribe' is verbatim ASR (what the
 # CS-Dialogue eval scores); 'translate' mirrors the production interpreter.
-TRANSCRIBE_INSTRUCTIONS = (
+#
+# Versioning: prompts are kept as named constants so a sweep can attribute
+# MER deltas to specific rule changes. `TRANSCRIBE_INSTRUCTIONS` is the
+# single alias for "what currently runs by default"; flip it to point at
+# a different version after that version wins its A/B.
+#
+#   v1 — original production prompt (best on tier1: avg MER 0.134)
+#   v2 — 2026-07 rewrite with 5 stricter rules (regressed: 0.159, +0.025)
+#   v3 — v1 + the 3 net-positive v2 rules (drop v2's rule 4 silence and
+#         rule 5 "output nothing if unclear", which caused head-drop and
+#         empty outputs on tier1)
+#
+# Override at runtime with `instructions=` on QwenRealtimeClient.
+
+TRANSCRIBE_INSTRUCTIONS_V1 = (
     "You are a speech-to-text transcription engine. Transcribe the user's "
     "speech EXACTLY as spoken, word for word, in the original language(s). "
     "The speech freely mixes Mandarin Chinese and English within a single "
@@ -132,6 +146,70 @@ TRANSCRIBE_INSTRUCTIONS = (
     "no language tags, no quotation marks, no markdown, no commentary. If "
     "nothing intelligible was said, output nothing."
 )
+
+# v2 (2026-07) — kept for opt-in reproduction. **Do not make this the
+# default**: a tier1 A/B (n=40) showed it regresses +0.025 MER on the mean
+# and triggers 1 fully-empty output, because rule 4 ("wait ≥0.5s of
+# silence before writing") combined with rule 5 ("output nothing if not
+# intelligible") makes the model drop sentence heads and hallucinate
+# substitutions to fill the gap.
+TRANSCRIBE_INSTRUCTIONS_V2 = (
+    "You are a speech-to-text transcription engine. Transcribe the user's "
+    "speech EXACTLY as spoken, word for word, in the original language(s). "
+    "The speech freely mixes Mandarin Chinese and English within a single "
+    "utterance — keep every word in the language it was actually spoken; do "
+    "NOT translate anything.\n"
+    "Strict rules (every output must obey all five):\n"
+    "1. SET: Write all Chinese in SIMPLIFIED Chinese (简体). Never use "
+    "繁体, 正體, 日式漢字, full-width Latin letters, or full-width "
+    "punctuation. Numbers must be Arabic digits (0-9), never 中文数字 "
+    "(五, 三十, etc.).\n"
+    "2. NO LANGUAGE FLIP: If the user speaks English, output English "
+    "(do NOT translate to Chinese). If the user speaks Chinese, output "
+    "Chinese (do NOT translate to English). Mixed-language spans must "
+    "stay mixed.\n"
+    "3. NO FILLERS: Output ONLY what was actually said. Do NOT add "
+    "filler words such as 'um', 'uh', '嗯', '哦', '呃', '那个' unless "
+    "the user literally said them. Spoken pauses and silence are not "
+    "transcribable content — leave them out.\n"
+    "4. NO PARTIALS: Wait until the utterance has ended (≥0.5s of "
+    "silence) before writing any text. Do not stream partial hypotheses "
+    "into the output, and do not duplicate tokens across revisions.\n"
+    "5. NO COMMENTARY: Output ONLY the raw transcription. No labels "
+    "(no 'ZH:'/'EN:'/'Transcript:'), no language tags, no quotation marks, "
+    "no markdown, no preamble, no apology, no trailing period. If nothing "
+    "intelligible was said, output nothing."
+)
+
+# v3 (2026-07) — v1 + the three rules that didn't backfire. Goal: lift
+# the v1 baseline by +0.005 to +0.015 without re-introducing the head-drop
+# behaviour. The two v2 rules dropped here (#4 silence gate, #5 "output
+# nothing") are the ones that caused tier1 regressions; if you want them
+# back, run with --instructions v2 instead.
+TRANSCRIBE_INSTRUCTIONS_V3 = (
+    "You are a speech-to-text transcription engine. Transcribe the user's "
+    "speech EXACTLY as spoken, word for word, in the original language(s). "
+    "The speech freely mixes Mandarin Chinese and English within a single "
+    "utterance — keep every word in the language it was actually spoken; do "
+    "NOT translate anything. Write all Chinese characters in SIMPLIFIED "
+    "Chinese (简体字).\n"
+    "Rules:\n"
+    "1. SET: Use simplified Chinese (简体) only. Numbers must be Arabic "
+    "digits (0-9); never 中文数字 (五, 三十, etc.). No full-width Latin "
+    "letters or full-width punctuation.\n"
+    "2. NO LANGUAGE FLIP: If the user speaks English, output English "
+    "(do NOT translate to Chinese). If the user speaks Chinese, output "
+    "Chinese (do NOT translate to English). Mixed-language spans stay mixed.\n"
+    "3. NO FILLERS: Do not add 'um', 'uh', '嗯', '哦', '呃', '那个' "
+    "unless the user literally said them.\n"
+    "Output ONLY the raw transcription text: no labels, no language "
+    "tags, no quotation marks, no markdown, no commentary."
+)
+
+# Active default. Set to V1 after the tier1 A/B (REPORT.tier1.ab_round1.md)
+# showed v2 regressed; V3 is the dev candidate that should be promoted here
+# once it shows a non-negative ΔMER on tier2.
+TRANSCRIBE_INSTRUCTIONS = TRANSCRIBE_INSTRUCTIONS_V1
 TRANSLATE_INSTRUCTIONS = (
     "You are a real-time interpreter. The user speaks either Chinese or "
     "English. For each utterance, output the translation in BOTH languages "
@@ -156,7 +234,9 @@ class QwenRealtimeClient:
                  task: str = "transcribe",
                  trailing_silence_ms: int = 800,
                  commit_mode: str = "manual",
-                 realtime: bool = True) -> None:
+                 realtime: bool = True,
+                 instructions: Optional[str] = None,
+                 repetition_penalty: Optional[float] = None) -> None:
         self.endpoint = endpoint
         self.model = model
         self.api_key = api_key
@@ -170,8 +250,15 @@ class QwenRealtimeClient:
         if task not in ("transcribe", "translate"):
             raise ValueError(f"task must be 'transcribe' or 'translate', got {task!r}")
         self.task = task
-        self.instructions = (TRANSCRIBE_INSTRUCTIONS if task == "transcribe"
-                             else TRANSLATE_INSTRUCTIONS)
+        if instructions is None:
+            instructions = (TRANSCRIBE_INSTRUCTIONS if task == "transcribe"
+                            else TRANSLATE_INSTRUCTIONS)
+        self.instructions = instructions
+        # Optional sampling knobs — None means "don't send", so a
+        # session.update stays minimal by default.
+        if repetition_penalty is not None and repetition_penalty <= 0:
+            raise ValueError("repetition_penalty must be > 0 when set")
+        self.repetition_penalty = repetition_penalty
 
     async def transcribe(self, pcm16_mono: bytes, sample_id: str) -> EvalResult:
         """Open a fresh WS, push the whole buffer, wait for the final
@@ -212,6 +299,8 @@ class QwenRealtimeClient:
                     "input_audio_format": "pcm16",
                     "turn_detection": turn_detection,
                     "instructions": self.instructions,
+                    **({"repetition_penalty": self.repetition_penalty}
+                       if self.repetition_penalty is not None else {}),
                 },
             }))
 
