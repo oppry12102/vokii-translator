@@ -101,6 +101,13 @@ Requires JDK 17, Android SDK with platform 34, and a DashScope API key.
    `buildFinished` hook in `app/build.gradle` also copies both APKs up
    one level as `vokii-debug.apk` and `vokii-release.apk`.
 
+GitHub releases ship **source only** — no APK binaries attached. Build
+locally from a tagged checkout to install. The reason: the release APK
+embeds the DashScope key from `local.properties` and is reproducible
+from the public sources, so fan-out from a GitHub release adds no
+value and just creates more copies of a leaked-by-construction key
+(see [Security notes](#security-notes)).
+
 The API key is read at configuration time and compiled into
 `BuildConfig.DEFAULT_QWEN_API_KEY`; the resulting APK ships with a
 working default — anyone who decompiles it can recover the key. That's

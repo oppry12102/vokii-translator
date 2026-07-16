@@ -10,6 +10,14 @@ Cascade pipeline ships as the **default** behaviour. Two-stage
 mic → ASR → MT replaces the joint Qwen-Omni call. Settings UI is
 slimmed to only the controls that actually change behaviour.
 
+> **Release policy**: as of v2.2.0, GitHub releases ship **source only**
+> — no APK assets attached. Build locally with `./gradlew :app:assembleRelease`
+> after putting a DashScope key in `local.properties`. The bundled QWEN_API_KEY
+> is recoverable from any APK that ships it, so we treat the public-release
+> APK as leaked-by-default and don't fan the binary out from a tag.
+> The `keystore/vokii-release.jks` committed to this repo is for local
+> development-build reproducibility only — not a distribution channel.
+
 ### Added
 - `CascadeEngine` — orchestrates the chained pipeline (`mic → step 1
   ASR → step 2 MT → bilingual UI`). Implements `AsrEngine` so it
