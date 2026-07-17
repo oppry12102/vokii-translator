@@ -8,8 +8,8 @@ android {
         applicationId "com.vokii.translator"
         minSdk 26
         targetSdk 34
-        versionCode 4
-        versionName "2.2.0"
+        versionCode 5
+        versionName "2.3.0"
 
         // App is Chinese/English only — drop the ~80 locale translations that
         // AndroidX/Material libraries ship, trimming resources.arsc.

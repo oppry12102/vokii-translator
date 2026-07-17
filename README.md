@@ -1,8 +1,10 @@
 # Vokii
 
 Android voice translator: speak in Chinese or English, see the other
-language live as you talk. Cloud-only — no on-device speech model, no
-GMS/HMS dependency.
+language live as you talk. You can also speak control commands ("下面
+改成中日翻译", "暂停", "总结一下") and they fire as LLM tool calls —
+see [Voice commands](#voice-commands). Cloud-only — no on-device speech
+model, no GMS/HMS dependency.
 
 Target: Huawei / HarmonyOS phones and any AOSP device with a working
 network path to DashScope.
@@ -78,6 +80,42 @@ either as a user-editable field invites typos and doesn't actually
 change behaviour. If you need to point at a non-default endpoint or
 pick a different ASR language, build with the right `local.properties`
 entries instead.
+
+## Voice commands
+
+Besides translating speech, Vokii listens for natural-language control
+commands and runs them as LLM tool calls — no Settings taps needed. The
+MT model (`qwen-plus`) is given the live session state plus a tool
+catalog; when the user says something that's a control intent rather
+than a phrase to translate, it emits `tool_calls` instead of a
+translation. Examples (Chinese or English both work):
+
+| Say | Tool fired |
+|-----|------------|
+| 下面改成中日翻译 / translate to Japanese | `set_translation_languages` (auto-flips direction) |
+| 只显示日文就好 / show English only | `set_display_mode` |
+| 翻译得更文雅一些 | `set_translation_mode` (style) |
+| 温度调到 0.7 | `set_translation_mode` (temperature) |
+| 暂停 / pause | `toggle_mic` (engine stays warm, capture skips) |
+| 切换到普通模式 / switch to joint | `toggle_cascade` (next mic tap) |
+| 打开调试 / open debug | `toggle_debug` |
+| 把日志设成详细模式 | `set_log_level` |
+| 现在是什么设置？ | `get_current_settings` |
+| 清空翻译 | `clear_transcript` |
+| 复制到剪贴板 | `export_transcript` |
+| 总结一下 | `summarize_session` |
+| 重新翻译上一句 | `re_translate_last` |
+| 你能做什么？ / help | `list_commands` |
+
+State-changing commands carry a snapshot so the most recent one is
+undoable — tap its chip in the transcript. `SessionContext` feeds the
+current state + recent commands + recent utterances back into the
+prompt so follow-ups like "改成中文" (change to *what*?) can be
+disambiguated. Destructive commands (`clear_transcript`) are not
+undoable.
+
+A debug-only inject panel (hidden in release builds) lets you exercise
+the full tool chain by typing a phrase instead of speaking.
 
 ## Build
 
@@ -165,8 +203,16 @@ See `tools/eval/README.md` for the full driver list and
 │       ├── QwenMtClient.java    #   ◄── qwen-plus chat completion (SSE)
 │       ├── QwenOmniEngine.java  #   joint path (Settings → off)
 │       ├── QwenOmniRealtimeClient.java
-│       ├── AndroidSpeechEngine.java
-│       ├── Bilingual.java       #   ZH/EN route on shared `ZH:`/`EN:` text
+│       ├── MtRunner.java        #   shared MT executor + client factory
+│       ├── Turn.java / TurnParser.java  #  bilingual ZH/EN (any pair) parse
+│       ├── BuiltInTools.java    #   the 13 voice tools
+│       ├── ToolRegistry.java / ToolDispatcher.java
+│       ├── ToolCall.java / ToolCallAccumulator.java
+│       ├── CommandResult.java   #   EnumSet<Effect> + Builder
+│       ├── SessionConfig.java / SessionContext.java
+│       ├── MtPromptBuilder.java
+│       ├── TranscriptStore.java
+│       ├── Json.java / LangDisplay.java   #   null-safe opt / lang names
 │       ├── Constants.java
 │       ├── DebugLogger.java
 │       └── CrashReporter.java
@@ -176,6 +222,7 @@ See `tools/eval/README.md` for the full driver list and
 │   ├── cascade_step2.py         #   cascade MT score
 │   ├── cascade_compare.py       #   paired win/tie/loss against a baseline
 │   ├── cascade_latency.py       #   joint vs cascade2 TTFB / total / max_delta_gap
+│   ├── capture_funasr_frame.py  #   dump the SDK's on-wire ASR start-task frame
 │   ├── eval.py                  #   v1 joint engine eval (pre-cascade)
 │   ├── metrics.py
 │   ├── qwen_client.py
@@ -203,8 +250,9 @@ See `tools/eval/README.md` for the full driver list and
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md). Latest: **v2.2.0** — cascade as
-default + minimal settings UI.
+See [CHANGELOG.md](CHANGELOG.md). Latest: **v2.3.0** — voice-control
+subsystem + hardening pass (concurrency/leak fixes, fun-asr −52 % MER
+reclaimed).
 
 ## License
 

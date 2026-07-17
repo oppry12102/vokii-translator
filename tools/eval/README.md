@@ -256,3 +256,8 @@ target.
   speakers — tune per your data.
 - For very long audio (>30s), you may want to split into chunks to
   keep `response.done` from taking too long.
+- `capture_funasr_frame.py` is a protocol diagnostic, not an eval driver:
+  it connects to a DashScope ASR model with SDK debug logging on and
+  dumps the exact `run-task` start frame. Use it to diff the Python SDK's
+  on-wire payload against `ParaformerAsrClient.sendStartTask` (Java) when
+  an ASR model rejects the app's handshake.
