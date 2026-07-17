@@ -9,6 +9,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.widget.Button;
@@ -76,6 +78,20 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
      * current one and discards itself if superseded by a newer render call.
      */
     private int scrollGen;
+
+    // ----- P3: render throttling -----
+    // MT/ASR/spec deltas can fire many times per second; rebuilding the whole
+    // transcript + setText + layout on every delta is the classic TextView
+    // perf trap (and gets worse as history grows). Coalesce: renderTranscript()
+    // marks dirty and schedules at most one render per RENDER_THROTTLE_MS via
+    // this handler. The scheduled render always picks up the latest state, so
+    // nothing is lost — just de-duplicated to ~20 fps. call sites are
+    // unchanged; renderTranscript() is now the throttled entry, the real work
+    // moved to renderTranscriptNow().
+    private final Handler renderHandler = new Handler(Looper.getMainLooper());
+    private boolean renderScheduled;
+    private boolean renderDirty;
+    private static final int RENDER_THROTTLE_MS = 50;
 
     private AsrEngine asr;
     private TranslationController controller;
@@ -303,6 +319,9 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // Drop any pending throttled render so it doesn't fire into a
+        // destroyed view.
+        renderHandler.removeCallbacksAndMessages(null);
         if (controller != null) controller.stop();
     }
 
@@ -797,7 +816,41 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
      * and stays clipped. Waiting for the layout to complete is what actually
      * pins the new line to the visible bottom.
      */
+    /**
+     * Re-render the transcript view as {@code history + currentTurn} and, if
+     * the user was already at the bottom, keep it pinned there. If the user
+     * has scrolled up to read history, leave their scroll position alone.
+     *
+     * <p>Throttled (P3): this is the entry point all callers use. It marks
+     * the render dirty and schedules at most one {@link #renderTranscriptNow}
+     * per {@link #RENDER_THROTTLE_MS}; the scheduled run always renders the
+     * latest state, so high-frequency streaming deltas (MT/ASR/spec) de-dup
+     * to ~20 fps instead of triggering a full setText+layout each. The final
+     * state always renders within one throttle window.
+     *
+     * <p>The auto-scroll runs from an {@link ViewTreeObserver.OnGlobalLayoutListener}
+     * — NOT from a {@code scroll.post()} — because setText only schedules a
+     * layout pass, and a posted runnable typically runs BEFORE the layout.
+     * fullScroll on the old layout scrolls to the OLD bottom; the new
+     * content (added at the end) is then laid out below that scroll position
+     * and stays clipped. Waiting for the layout to complete is what actually
+     * pins the new line to the visible bottom.
+     */
     private void renderTranscript() {
+        renderDirty = true;
+        if (!renderScheduled) {
+            renderScheduled = true;
+            renderHandler.postDelayed(this::renderTranscriptNow, RENDER_THROTTLE_MS);
+        }
+    }
+
+    /** The actual render — builds the text, setText, and pins to bottom if
+     *  appropriate. Always invoked on the main thread via the throttle
+     *  handler. */
+    private void renderTranscriptNow() {
+        renderScheduled = false;
+        if (!renderDirty) return;
+        renderDirty = false;
         StringBuilder sb = new StringBuilder();
         SessionConfig.DisplayMode mode = session.displayMode();
         for (int i = 0; i < history.size(); i++) {
