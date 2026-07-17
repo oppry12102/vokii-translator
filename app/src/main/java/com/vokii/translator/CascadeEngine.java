@@ -101,6 +101,27 @@ public class CascadeEngine implements AsrEngine {
      *  Race with the WS-thread onDelta is harmless — at worst a duplicate or
      *  missed log line. */
     private volatile boolean loggedAsrPartial;
+
+    // ----- P1: speculative MT on ASR partials -----
+    /** Monotonic generation tag. Every speculative fire AND every final
+     *  translateTurn bumps it; each MT callback captures the gen it was
+     *  started with and drops itself if {@code gen != mtGeneration}. This
+     *  stops a cancelled speculative's late-arriving onPartial from
+     *  clobbering the newer speculative / final translation. */
+    private volatile long mtGeneration;
+    /** The in-flight speculative MT client (non-committing draft), or null.
+     *  Cancelled when a newer speculative fires, when the final MT starts,
+     *  or on stop(). */
+    private volatile QwenMtClient inFlightSpec;
+    /** nanoTime of the last speculative fire — throttles spec MT to at most
+     *  one per {@link #SPEC_MIN_INTERVAL_NS}. */
+    private volatile long lastSpecNanos;
+    /** Minimum partial length before a speculative MT is worth firing —
+     *  shorter partials are too incomplete to translate meaningfully. */
+    private static final int SPEC_MIN_CHARS = 6;
+    /** Minimum gap between speculative fires. The spec MT itself takes
+     *  ~0.5 s TTFB, so firing faster than this just wastes calls. */
+    private static final long SPEC_MIN_INTERVAL_NS = 700_000_000L;
     /** Process-wide single-thread MT executor shared with re-translate /
      *  summarize (see {@link MtRunner}). Only one engine is ever active at
      *  a time (reconcileEngineIfNeeded refuses to hot-swap while listening),
@@ -168,6 +189,11 @@ public class CascadeEngine implements AsrEngine {
                     debug.log("LAT", "asr_first_partial (verbatim caption → UI)");
                 }
                 cb.onPartialTranscript(turnText);
+                // P1: speculatively translate the partial so a draft shows
+                // during speech — hides the ~0.5 s MT TTFB the user would
+                // otherwise wait after pausing. maybeSpeculate throttles and
+                // skips while a final MT is in flight.
+                maybeSpeculate(turnText);
             }
             @Override public void onResult(String text) {
                 if (!started || text == null || text.isEmpty()) return;
@@ -194,6 +220,10 @@ public class CascadeEngine implements AsrEngine {
      *  or Settings takes effect on the next turn automatically. */
     private void translateTurn(String verbatim) {
         final long t0 = System.nanoTime();
+        // New generation: drops any in-flight speculative's late callbacks,
+        // and tags this final MT so it can't be clobbered by a stale spec.
+        final long gen = ++mtGeneration;
+        cancelSpec();  // the final is authoritative; kill the draft in flight
         loggedAsrPartial = false;  // next sentence's first ASR partial will log
         debug.log("LAT", "mt_start (asr final → mt request)");
         debug.log("MT", "translateTurn len=" + verbatim.length() + " src=" + session.sourceLang()
@@ -206,39 +236,40 @@ public class CascadeEngine implements AsrEngine {
         Handler main = new Handler(Looper.getMainLooper());
         mt.translate(verbatim, new QwenMtClient.Listener() {
             @Override public void onReady() {
+                if (gen != mtGeneration) return;
                 debug.log("LAT", "mt_ttfb_ms=" + (System.nanoTime() - t0) / 1_000_000);
             }
             @Override public void onDelta(String turnText) {
-                if (!started) return;
+                if (!started || gen != mtGeneration) return;
                 // Pass the raw MT output (containing ZH:/EN: labels) to
                 // the TranslationController — it knows how to split the
                 // bilingual pair via TurnParser. Pre-parsing here and
                 // re-joining with "\n" loses the labels and TurnParser
                 // silently routes everything to the src column.
                 main.post(() -> {
-                    if (!started) return;
+                    if (!started || gen != mtGeneration) return;
                     cb.onPartial(turnText);
                 });
             }
             @Override public void onResult(String text) {
-                if (!started) return;
+                if (!started || gen != mtGeneration) return;
                 debug.log("LAT", "mt_total_ms=" + (System.nanoTime() - t0) / 1_000_000);
                 main.post(() -> {
-                    if (!started) return;
+                    if (!started || gen != mtGeneration) return;
                     cb.onFinal(text);
                 });
             }
             @Override public void onToolCalls(java.util.List<ToolCall> calls) {
-                if (!started || calls == null || calls.isEmpty()) return;
+                if (!started || gen != mtGeneration || calls == null || calls.isEmpty()) return;
                 main.post(() -> {
-                    if (!started) return;
+                    if (!started || gen != mtGeneration) return;
                     cb.onCommand(calls);
                 });
             }
             @Override public void onError(String message) {
-                if (!started) return;
+                if (!started || gen != mtGeneration) return;
                 main.post(() -> {
-                    if (!started) return;
+                    if (!started || gen != mtGeneration) return;
                     cb.onError(-2, "MT step2: " + message);
                 });
             }
@@ -246,6 +277,76 @@ public class CascadeEngine implements AsrEngine {
         // translate() blocks until the turn finishes; clear the in-flight
         // reference so a later stop() doesn't cancel an already-completed call.
         currentMt = null;
+    }
+
+    // ----- P1: speculative MT on ASR partials -----
+
+    /** Maybe fire a speculative MT on an ASR partial so a draft translation
+     *  appears during speech. Throttled, length-gated, and skipped while a
+     *  final MT is in flight (avoids cross-sentence currentTurn contention
+     *  — the live caption still shows during the skip). */
+    private void maybeSpeculate(String partial) {
+        if (partial.length() < SPEC_MIN_CHARS) return;
+        if (currentMt != null) return;  // a final MT is committing — don't contend
+        long now = System.nanoTime();
+        if (now - lastSpecNanos < SPEC_MIN_INTERVAL_NS) return;
+        lastSpecNanos = now;
+        cancelSpec();
+        speculativeTranslate(partial);
+    }
+
+    /** Run a non-committing MT draft for {@code partial} on the speculative
+     *  executor. Only {@code onPartial} is forwarded (as a live translation
+     *  draft via {@code cb.onPartial}); {@code onResult}/{@code onToolCalls}
+     *  are dropped — the final MT (triggered by ASR sentence-final) is the
+     *  one that commits and fires commands. Gen-guarded so a cancelled spec
+     *  can't clobber a newer spec / final. */
+    private void speculativeTranslate(String partial) {
+        final long gen = ++mtGeneration;
+        debug.log("LAT", "spec_mt_start len=" + partial.length());
+        String prompt = MtPromptBuilder.buildSystemPrompt(sessionContext, toolRegistry);
+        org.json.JSONArray tools = MtPromptBuilder.buildToolsJson(toolRegistry);
+        final QwenMtClient mt = MtRunner.client(config.getApiKey(), prompt, tools,
+                                                session.temperature(), debug);
+        inFlightSpec = mt;
+        final Handler main = new Handler(Looper.getMainLooper());
+        MtRunner.specExecutor().execute(() -> {
+            if (gen != mtGeneration) return;  // superseded before we even started
+            final long t0 = System.nanoTime();
+            mt.translate(partial, new QwenMtClient.Listener() {
+                @Override public void onReady() {
+                    if (gen == mtGeneration)
+                        debug.log("LAT", "spec_mt_ttfb_ms=" + (System.nanoTime() - t0) / 1_000_000);
+                }
+                @Override public void onDelta(String turnText) {
+                    if (gen != mtGeneration) return;  // superseded — drop
+                    main.post(() -> {
+                        if (!started || gen != mtGeneration) return;
+                        cb.onPartial(turnText);  // draft translation → UI
+                    });
+                }
+                @Override public void onResult(String text) {
+                    // Draft complete — do NOT commit. The final MT commits.
+                    if (gen == mtGeneration) debug.log("LAT", "spec_mt_done (draft, not committed)");
+                }
+                @Override public void onToolCalls(java.util.List<ToolCall> calls) {
+                    // Don't fire commands speculatively — the final MT will.
+                }
+                @Override public void onError(String message) {
+                    // Silent: a failed draft just means the user waits for final.
+                }
+            });
+            if (inFlightSpec == mt) inFlightSpec = null;
+        });
+    }
+
+    /** Cancel any in-flight speculative MT. */
+    private void cancelSpec() {
+        QwenMtClient s = inFlightSpec;
+        inFlightSpec = null;
+        if (s != null) {
+            try { s.cancel(); } catch (Throwable ignored) {}
+        }
     }
 
     /** Tear down a half-started engine: AudioRecord init failed after the
@@ -361,12 +462,13 @@ public class CascadeEngine implements AsrEngine {
         }
         // Cancel an in-flight MT turn instead of letting it run to completion
         // after the user stopped. The shared executor worker unblocks and the
-        // listener callbacks bail on the !started check.
+        // listener callbacks bail on the !started / gen check.
         QwenMtClient mt = currentMt;
         currentMt = null;
         if (mt != null) {
             try { mt.cancel(); } catch (Throwable ignored) {}
         }
+        cancelSpec();  // also kill any speculative draft still running
         record = null;
         debug.log("ASR", "cascade stopped");
     }

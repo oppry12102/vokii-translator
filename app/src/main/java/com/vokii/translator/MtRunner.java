@@ -33,10 +33,24 @@ final class MtRunner {
         return t;
     });
 
+    /** Separate single-thread executor for speculative MT (P1) — runs
+     *  ahead of the final MT on ASR partials so a draft translation shows
+     *  during speech. Kept off {@link #executor()} so a speculative call
+     *  never blocks the final MT (which would re-introduce the TTFB wait). */
+    private static final ExecutorService SPEC_EXEC = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "vokii-mt-spec");
+        t.setDaemon(true);
+        return t;
+    });
+
     private MtRunner() {}
 
-    /** Shared single-thread MT executor. */
+    /** Shared single-thread MT executor (final translations, re-translate,
+     *  summarize — anything that commits). */
     static ExecutorService executor() { return EXEC; }
+
+    /** Executor for speculative (non-committing) MT drafts. */
+    static ExecutorService specExecutor() { return SPEC_EXEC; }
 
     /** Build a {@link QwenMtClient} for {@link QwenMtClient#DEFAULT_MODEL}.
      *  {@code systemPrompt} null/empty falls back to the client's default;
