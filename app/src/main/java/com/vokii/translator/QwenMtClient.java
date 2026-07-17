@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
+import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -25,7 +26,7 @@ import okio.BufferedSource;
  * Cascade architecture step 2: takes the verbatim transcript from
  * {@link ParaformerAsrClient} and produces a ZH / EN pair, returned as a
  * single SSE stream of incremental {@code ZH: .. / EN: ..} text. We
- * parse the deltas through {@link Bilingual} so callers get the same
+ * parse the deltas through {@link TurnParser} so callers get the same
  * {@link AsrEngine.Callback#onPartial(String)} / {@link #onFinal(String)}
  * shape that {@link QwenOmniEngine} surfaces — which means
  * {@link TranslationController} needs no change to drive the cascade.
@@ -59,7 +60,7 @@ import okio.BufferedSource;
  *   <li><b>Quality</b>: qwen-plus is a general LLM, not an MT-tuned
  *       model. Translation quality is slightly below qwen-mt-plus on
  *       code-switch boundaries but well within "shippable" range for
- *       the live-translator UX, and the Bilingual prompt format keeps
+ *       the live-translator UX, and the two-line ZH:/EN: prompt format keeps
  *       it on-spec.</li>
  *   <li><b>Streaming</b>: SSE deltas are emitted as the model generates.
  *       {@link Listener#onDelta(String)} fires for each delta so the UI
@@ -82,9 +83,11 @@ public class QwenMtClient {
      */
     public static final String DEFAULT_MODEL = "qwen-plus";
 
-    /** Default MT prompt. Mirrors the Python harness's TRANSLATE_INSTRUCTIONS
-     *  (qwen_client.py) so behaviour is identical between eval and prod. */
-    private static final String MT_INSTRUCTIONS =
+    /** Fallback prompt used only when the caller does not pass one
+     *  explicitly. Kept for tests and ad-hoc invocations; production
+     *  always supplies a session-derived prompt from
+     *  {@link MtPromptBuilder#buildSystemPrompt}. */
+    private static final String DEFAULT_PROMPT =
             "You are a real-time interpreter. The user speaks either Chinese " +
             "or English. For each utterance, output the translation in BOTH " +
             "languages using EXACTLY this two-line format and nothing else:\n" +
@@ -100,25 +103,80 @@ public class QwenMtClient {
         /** Incremental full text (accumulated since stream start) for
          *  the in-progress MT turn. UI surfaces via {@code onPartial}. */
         void onDelta(String turnText);
-        /** Stream finished — accumulated text is the final translation. */
+        /** Stream finished — accumulated text is the final translation.
+         *  When tool_use is active, either {@code onResult} carries the
+         *  translation (no commands) OR {@code onResult} carries an
+         *  empty string and {@code onToolCalls} carries the commands.
+         *  In OpenAI-compat streams the two are mutually exclusive at the
+         *  finish_reason level (verified against qwen-plus 2026-07-16). */
         void onResult(String text);
+        /** Tool-use calls the LLM wants to invoke. Only fired when the
+         *  request was sent with non-null {@code tools}. Fired after
+         *  {@code onResult} regardless of which one carries data. */
+        default void onToolCalls(java.util.List<ToolCall> calls) {}
         /** Transport, HTTP, or server error. */
         void onError(String message);
     }
 
     private final String apiKey;
     private final String model;
+    private final String systemPrompt;
+    private final org.json.JSONArray tools;
+    private final float temperature;
     private final DebugLogger debug;
-    private final OkHttpClient http;
+    /** The in-flight HTTP call, if any. Held so {@link #cancel()} can abort
+     *  a turn when the engine stops mid-translation. Volatile: set on the MT
+     *  worker, read/cancelled from the UI thread via {@link #cancel()}. */
+    private volatile Call currentCall;
+
+    /** Process-wide shared client. OkHttp clients own a Dispatcher (up to
+     *  64 threads) + a ConnectionPool (its own cleanup thread + pooled
+     *  sockets); allocating one per QwenMtClient — and CascadeEngine
+     *  constructs a new QwenMtClient every turn — leaked both per turn.
+     *  Sharing one client reuses the pool/threads across the whole session
+     *  and is the documented OkHttp usage pattern. Never shut down — it
+     *  lives for the app lifetime, like the ASR client below. */
+    private static final OkHttpClient SHARED_HTTP = new OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS) // streaming — cadence guarded by callTimeout
+            .callTimeout(120, TimeUnit.SECONDS)    // hard ceiling per turn so a stalled SSE
+                                                    // can't block the shared MT executor forever
+            .build();
 
     public QwenMtClient(String apiKey, String model, DebugLogger debug) {
+        this(apiKey, model, DEFAULT_PROMPT, null, 0.3f, debug);
+    }
+
+    /** Full constructor. {@code systemPrompt} replaces the hardcoded
+     *  prompt. {@code tools} is the OpenAI-compat tools array (null =
+     *  no tools). {@code temperature} is clamped to [0, 1] by the
+     *  caller (see {@link SessionConfig#setTemperature}). */
+    public QwenMtClient(String apiKey, String model, String systemPrompt,
+                        org.json.JSONArray tools, float temperature, DebugLogger debug) {
         this.apiKey = apiKey;
         this.model = model;
+        this.systemPrompt = (systemPrompt == null || systemPrompt.isEmpty())
+                ? DEFAULT_PROMPT : systemPrompt;
+        this.tools = tools;
+        this.temperature = clampTemp(temperature);
         this.debug = debug;
-        this.http = new OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(0, TimeUnit.MILLISECONDS) // streaming
-                .build();
+    }
+
+    private static float clampTemp(float t) {
+        if (Float.isNaN(t)) return 0.3f;
+        if (t < 0f) return 0f;
+        if (t > 1f) return 1f;
+        return t;
+    }
+
+    /** Abort the in-flight turn (if any). Safe to call from any thread;
+     *  no-op if no turn is running. The blocked {@code execute()} in
+     *  {@link #translate} unblocks with an IOException → onError. */
+    public void cancel() {
+        Call c = currentCall;
+        if (c != null && !c.isCanceled()) {
+            try { c.cancel(); } catch (Throwable ignored) {}
+        }
     }
 
     /** Fire one streaming chat-completion call. Blocks the calling thread
@@ -138,7 +196,8 @@ public class QwenMtClient {
 
             debug.log("MT", "POST " + model + " verbatim.len=" + verbatimTranscript.length());
 
-            try (Response resp = http.newCall(httpReq).execute()) {
+            currentCall = SHARED_HTTP.newCall(httpReq);
+            try (Response resp = currentCall.execute()) {
                 debug.log("MT", "HTTP " + resp.code() + " " + (resp.message() == null ? "" : resp.message()));
                 if (!resp.isSuccessful()) {
                     String errBody = "";
@@ -155,8 +214,10 @@ public class QwenMtClient {
                 BufferedSource src = body.source();
                 l.onReady();
                 StringBuilder accumulated = new StringBuilder();
+                ToolCallAccumulator toolAcc = tools == null ? null : new ToolCallAccumulator();
                 int chunkCount = 0;
                 String firstSseLine = null;
+                boolean finishReasonToolCalls = false;
                 // SSE format: lines of "data: {json}\n\n", terminated by "data: [DONE]".
                 while (!src.exhausted()) {
                     String line = src.readUtf8Line();
@@ -168,33 +229,66 @@ public class QwenMtClient {
                     if (!line.startsWith("data:")) continue;
                     String payload = line.substring(5).trim();
                     if (payload.equals("[DONE]")) break;
-                    String delta = parseDelta(payload);
                     chunkCount++;
-                    if (delta != null && !delta.isEmpty()) {
-                        accumulated.append(delta);
+                    String contentDelta = parseContentDelta(payload);
+                    if (contentDelta != null && !contentDelta.isEmpty()) {
+                        accumulated.append(contentDelta);
                         l.onDelta(accumulated.toString());
+                    }
+                    if (toolAcc != null) {
+                        JSONArray tcArr = parseToolCallsArray(payload);
+                        if (tcArr != null) toolAcc.feed(tcArr);
+                    }
+                    if ("tool_calls".equals(parseFinishReason(payload))) {
+                        finishReasonToolCalls = true;
                     }
                 }
                 debug.log("MT", "chunks=" + chunkCount + " accumulated=" + accumulated.length()
                         + " first=" + (firstSseLine == null ? "<no-data-line>" : firstSseLine));
                 String finalText = accumulated.toString().trim();
-                if (finalText.isEmpty()) {
+                // When finish_reason is tool_calls, the LLM has spent its
+                // generation budget on emitting the tool_calls envelope;
+                // any concurrent "content" deltas in our accumulator are
+                // empty strings (verified against qwen-plus — content
+                // and tool_calls are mutually exclusive at this level).
+                if (finishReasonToolCalls) {
+                    finalText = "";
+                }
+                if (!finalText.isEmpty()) {
+                    l.onResult(finalText);
+                } else if (!finishReasonToolCalls) {
                     l.onError("empty MT response (" + chunkCount + " chunks, model=" + model + ")");
                 } else {
-                    l.onResult(finalText);
+                    // Pure tool_calls turn — still need to fire onResult("")
+                    // so the controller's render path reaches a clean
+                    // terminal state, and the current streaming card
+                    // closes before the tool chip lands.
+                    l.onResult("");
+                }
+                if (toolAcc != null) {
+                    java.util.List<ToolCall> calls = toolAcc.build();
+                    if (!calls.isEmpty()) {
+                        debug.log("MT", "tool_calls=" + calls.size());
+                        for (ToolCall c : calls) {
+                            debug.log("MT", "  " + c.name + " trigger=\"" + c.triggerText + "\"");
+                        }
+                        l.onToolCalls(calls);
+                    }
                 }
             }
         } catch (IOException ioe) {
             l.onError("MT IO: " + ioe.getMessage());
         } catch (Throwable t) {
             l.onError("MT ex: " + t.getMessage());
+        } finally {
+            currentCall = null;
         }
     }
 
     private JSONObject buildRequest(String verbatim) throws IOException, org.json.JSONException {
         JSONObject sysMsg = new JSONObject();
         sysMsg.put("role", "system");
-        sysMsg.put("content", MT_INSTRUCTIONS);
+        sysMsg.put("content", systemPrompt);
 
         JSONObject userMsg = new JSONObject();
         userMsg.put("role", "user");
@@ -205,8 +299,12 @@ public class QwenMtClient {
         JSONObject req = new JSONObject();
         req.put("model", model);
         req.put("stream", true);
-        req.put("temperature", 0.3);
+        req.put("temperature", (double) temperature);
         req.put("messages", messages);
+        if (tools != null) {
+            req.put("tools", tools);
+            req.put("tool_choice", "auto");
+        }
         return req;
     }
 
@@ -214,16 +312,45 @@ public class QwenMtClient {
      *  OpenAI-compatible stream emits
      *  {@code {"choices":[{"delta":{"content":"..."}}]}}.
      *  Returns null for non-content chunks (role-only, etc). */
-    private String parseDelta(String payload) {
+    private String parseContentDelta(String payload) {
         try {
             JSONObject o = new JSONObject(payload);
             JSONArray choices = o.optJSONArray("choices");
             if (choices == null || choices.length() == 0) return null;
             JSONObject delta = choices.getJSONObject(0).optJSONObject("delta");
             if (delta == null) return null;
-            return delta.optString("content", "");
+            return Json.optString(delta, "content", "");
         } catch (Throwable t) {
-            debug.log("MT", "parseDelta ex: " + t.getMessage());
+            debug.log("MT", "parseContentDelta ex: " + t.getMessage());
+            return null;
+        }
+    }
+
+    /** Pull the tool_calls array from a delta. Returns null when absent
+     *  (most deltas), the empty array when present-but-empty. */
+    private JSONArray parseToolCallsArray(String payload) {
+        try {
+            JSONObject o = new JSONObject(payload);
+            JSONArray choices = o.optJSONArray("choices");
+            if (choices == null || choices.length() == 0) return null;
+            JSONObject delta = choices.getJSONObject(0).optJSONObject("delta");
+            if (delta == null) return null;
+            return delta.optJSONArray("tool_calls");
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Pull the finish_reason from a delta. Returns null on any error
+     *  (the field is only present on the final chunk of a turn). */
+    private String parseFinishReason(String payload) {
+        try {
+            JSONObject o = new JSONObject(payload);
+            JSONArray choices = o.optJSONArray("choices");
+            if (choices == null || choices.length() == 0) return null;
+            JSONObject choice = choices.getJSONObject(0);
+            return Json.optString(choice, "finish_reason", null);
+        } catch (Throwable t) {
             return null;
         }
     }

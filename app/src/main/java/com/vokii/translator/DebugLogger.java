@@ -43,17 +43,51 @@ public class DebugLogger {
      *  the TextView. Increments monotonically under the buffer lock; the
      *  UI thread reads it (also under the lock) to know what to append. */
     private int appliedCount = 0;
+    /** Set by set_log_level tool. NORMAL = show only high-signal events
+     *  (status changes, tool calls, errors). VERBOSE = show everything
+     *  (every ASR packet, every MT chunk). Reads happen on background
+     *  threads; writes are atomic via volatile. */
+    private volatile Level level = Level.NORMAL;
     /** Synchronize on the deque itself — it's small and lock churn is fine
      *  at the rate we log. SimpleDateFormat is allocated per call (it's not
      *  thread-safe; a shared instance would corrupt under concurrent writes). */
     private final ThreadLocal<SimpleDateFormat> fmt =
             ThreadLocal.withInitial(() -> new SimpleDateFormat("HH:mm:ss.SSS", Locale.US));
 
+    public enum Level { QUIET, NORMAL, VERBOSE }
+
     public DebugLogger(TextView target) {
         this.target = target;
     }
 
+    public Level level() { return level; }
+
+    public void setLevel(Level l) {
+        if (l == null) l = Level.NORMAL;
+        this.level = l;
+    }
+
+    /** Tag → importance. Tags in NORMAL_KEEP are always shown. Tags in
+     *  VERBOSE_ONLY are dropped at NORMAL or QUIET. Tags in ALWAYS_SHOW
+     *  are shown at every level (critical errors etc). */
+    private static final java.util.Set<String> NORMAL_KEEP = new java.util.HashSet<>(java.util.Arrays.asList(
+            "boot", "ASR", "MT", "CMD", "INJECT", "engine", "perm", "pipeline"
+    ));
+    private static final java.util.Set<String> ALWAYS_SHOW = new java.util.HashSet<>(java.util.Arrays.asList(
+            "ERROR", "boot"
+    ));
+
+    private boolean shouldLog(String tag) {
+        if (level == Level.VERBOSE) return true;
+        if (level == Level.QUIET) return ALWAYS_SHOW.contains(tag);
+        // NORMAL: drop verbose-only tags. Currently no tag is verbose-only;
+        // NORMAL is the same as always-show for now. We keep the gate so
+        // we can mark future tags as verbose-only without touching this method.
+        return true;
+    }
+
     public void log(String tag, String msg) {
+        if (!shouldLog(tag)) return;
         final String line = format(tag, msg);
         synchronized (buffer) {
             buffer.addLast(line);
@@ -124,6 +158,13 @@ public class DebugLogger {
         main.post(() -> {
             if (target != null) target.setText("");
         });
+    }
+
+    /** Re-render the TextView from the current buffer. Called after
+     *  level change so the user immediately sees the new verbosity
+     *  (and so QUIET mode clears the panel). */
+    public void rerender() {
+        main.post(this::applyToTextView);
     }
 
     /** Snapshot the buffer for inspection (tests / debug dumps). */

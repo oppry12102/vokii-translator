@@ -19,7 +19,7 @@ import androidx.core.content.ContextCompat;
  * We forward the incremental text via {@link Callback#onPartial(String)}
  * and the finished turn via {@link Callback#onFinal(String)};
  * {@link TranslationController} parses it into the zh/en columns with
- * {@link Bilingual}. This single engine covers both the recognition and
+ * {@link TurnParser}. This single engine covers both the recognition and
  * translation stages — no second network call.
  */
 public class QwenOmniEngine implements AsrEngine {
@@ -108,12 +108,17 @@ public class QwenOmniEngine implements AsrEngine {
         }
 
         captureThread = new Thread(() -> {
+            // Local reference — see CascadeEngine for why the finally block
+            // must not read the `record` field (stop() nulls it while read()
+            // is still in a blocking native call, which would skip release()
+            // and leak the mic).
+            final AudioRecord r = record;
             byte[] frame = new byte[FRAME_BYTES];
             try {
-                record.startRecording();
+                r.startRecording();
                 debug.log("ASR", "capture started @" + SAMPLE_RATE + "Hz");
                 while (started) {
-                    int n = record.read(frame, 0, frame.length);
+                    int n = r.read(frame, 0, frame.length);
                     if (n > 0 && client != null) {
                         client.sendAudio(frame, n);
                     } else if (n < 0) {
@@ -124,8 +129,8 @@ public class QwenOmniEngine implements AsrEngine {
             } catch (Throwable t) {
                 debug.log("ASR", "capture ex: " + t.getMessage());
             } finally {
-                try { record.stop(); } catch (Throwable ignored) {}
-                try { record.release(); } catch (Throwable ignored) {}
+                try { r.stop(); } catch (Throwable ignored) {}
+                try { r.release(); } catch (Throwable ignored) {}
             }
         }, "vokii-omni-capture");
         captureThread.start();

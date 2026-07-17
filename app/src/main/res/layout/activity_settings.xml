@@ -10,29 +10,40 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="20dp">
 
+        <!-- Page title -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/title_settings"
             android:textColor="@color/text_primary"
-            android:textSize="20sp"
+            android:textSize="22sp"
             android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="8dp" />
 
-        <!-- API key (only user-facing setting; endpoint is hardcoded for qwen) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:text="@string/settings_intro"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <!-- API Key (the one setting that has no voice equivalent — it's
+             a credential, not a runtime toggle) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/setting_api_key"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
 
         <EditText
             android:id="@+id/input_api_key"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:hint="@string/setting_api_key_hint"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_secondary"
@@ -47,22 +58,36 @@
             android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
-        <!-- Cascade toggle (default ON) — fun-asr-realtime → qwen-plus.
-             Off falls back to the joint Qwen-Omni Realtime path. -->
+        <!-- Cascade mode (the only runtime toggle exposed in settings;
+             other toggles like debug are voice-controlled) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="22dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/setting_cascade_enabled"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_cascade_enabled"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/setting_cascade_hint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
             <Switch
                 android:id="@+id/switch_cascade"
@@ -70,29 +95,10 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <!-- Debug toggle (visibility of the rolling-log panel on the main screen) -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/setting_debug_enabled"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
-
-            <Switch
-                android:id="@+id/switch_debug"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <!-- No Save / Reset buttons. Settings auto-persist on back press. -->
+        <!-- No reset button — no other settings to reset. -->
+        <!-- Other toggles (debug, display mode, languages, mic, style, log
+             level, summarize, re-translate, copy) are all voice-controlled.
+             Say "help" or "你能做什么" to see the full command catalog. -->
 
     </LinearLayout>
 </ScrollView>

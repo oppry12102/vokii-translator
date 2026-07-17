@@ -95,16 +95,47 @@ public class ConfigStore {
         prefs.edit().putBoolean(Constants.KEY_DEBUG_VISIBLE, v).apply();
     }
 
-    /** Cascade (Paraformer→qwen-mt-plus) mode toggle. Default off so the
-     *  existing joint Qwen-Omni path is unchanged for users who don't
-     *  opt in. Eval showed −39 % relative MER on CS-Dialogue tier2 for
-     *  step 1 alone — see tools/eval/REPORT.cascade.step1.md. */
+    /** Cascade (Paraformer→qwen-mt-plus) mode toggle. Default ON (see
+     *  {@link Constants#DEFAULT_CASCADE_MODE}) — the cascade pipeline wins
+     *  on transcription MER per the CS-Dialogue eval. Users can fall back
+     *  to the joint Qwen-Omni path from Settings. */
     public boolean isCascadeMode() {
         return prefs.getBoolean(Constants.KEY_CASCADE_MODE, Constants.DEFAULT_CASCADE_MODE);
     }
 
     public void setCascadeMode(boolean v) {
         prefs.edit().putBoolean(Constants.KEY_CASCADE_MODE, v).apply();
+    }
+
+    /** Source language code for the MT prompt (e.g. "zh", "en", "ja").
+     *  BCP-47 short codes; the MT prompt builder uppercases them for label
+     *  generation (e.g. "zh" -> "ZH:"). */
+    public String getSourceLang() {
+        return prefs.getString(Constants.KEY_SRC_LANG, Constants.DEFAULT_SRC_LANG);
+    }
+
+    public void setSourceLang(String v) {
+        prefs.edit().putString(Constants.KEY_SRC_LANG,
+                safe(v, Constants.DEFAULT_SRC_LANG)).apply();
+    }
+
+    public String getTargetLang() {
+        return prefs.getString(Constants.KEY_TGT_LANG, Constants.DEFAULT_TGT_LANG);
+    }
+
+    public void setTargetLang(String v) {
+        prefs.edit().putString(Constants.KEY_TGT_LANG,
+                safe(v, Constants.DEFAULT_TGT_LANG)).apply();
+    }
+
+    /** Display mode: "both" / "source_only" / "target_only". */
+    public String getDisplayMode() {
+        return prefs.getString(Constants.KEY_DISPLAY_MODE, Constants.DEFAULT_DISPLAY_MODE);
+    }
+
+    public void setDisplayMode(String v) {
+        String normalized = "source_only".equals(v) || "target_only".equals(v) ? v : "both";
+        prefs.edit().putString(Constants.KEY_DISPLAY_MODE, normalized).apply();
     }
 
     public void reset() {

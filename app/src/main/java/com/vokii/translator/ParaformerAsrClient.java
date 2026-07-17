@@ -72,7 +72,16 @@ public class ParaformerAsrClient {
     private final String apiKey;
     private final String model;
     private final DebugLogger debug;
-    private final OkHttpClient http;
+
+    /** Process-wide shared client (see {@link QwenMtClient#SHARED_HTTP} for
+     *  the rationale — one client, reused across engine restarts, never
+     *  shut down). WebSocket connections themselves are per-instance; only
+     *  the dispatcher/connection-pool backing them is shared. */
+    private static final OkHttpClient SHARED_HTTP = new OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .build();
 
     private WebSocket ws;
     private Listener listener;
@@ -88,11 +97,6 @@ public class ParaformerAsrClient {
         this.apiKey = apiKey;
         this.model = model;
         this.debug = debug;
-        this.http = new OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .pingInterval(20, TimeUnit.SECONDS)
-                .readTimeout(0, TimeUnit.MILLISECONDS)
-                .build();
     }
 
     public boolean isOpen() { return open; }
@@ -106,7 +110,7 @@ public class ParaformerAsrClient {
                 .build();
 
         debug.log("ASR", "Paraformer WS connect " + url);
-        ws = http.newWebSocket(req, new Socket());
+        ws = SHARED_HTTP.newWebSocket(req, new Socket());
     }
 
     /**
@@ -130,26 +134,32 @@ public class ParaformerAsrClient {
     }
 
     public void close() {
-        // Send a finish-task envelope before closing so the server
-        // commits the in-flight utterance. Without this, the server
-        // discards the last partial sentence.
-        if (taskStarted && ws != null && open) {
+        // Snapshot the socket first, then null the field, so sendFinishTask
+        // (below) and the capture thread can't see a null mid-teardown. All
+        // sends use the local `s`, never the mutable `ws` field.
+        open = false;
+        WebSocket s = ws;
+        ws = null;
+        if (s == null) return;
+        // Send a finish-task envelope before closing so the server commits
+        // the in-flight utterance. Without this the server discards the last
+        // partial sentence.
+        if (taskStarted) {
             try {
-                sendFinishTask();
+                sendFinishTask(s);
             } catch (Throwable t) {
                 debug.log("ASR", "sendFinishTask ex: " + t.getMessage());
             }
         }
-        open = false;
-        WebSocket s = ws;
-        ws = null;
-        if (s != null) {
-            try { s.close(1000, "client stop"); } catch (Throwable ignored) {}
-        }
+        try { s.close(1000, "client stop"); } catch (Throwable ignored) {}
     }
 
-    /** Send the start-task envelope. Called once after WS open. */
-    private void sendStartTask() {
+    /** Send the start-task envelope. Called once after WS open. Takes the
+     *  {@link WebSocket} from {@code onOpen} rather than reading the mutable
+     *  {@link #ws} field — a concurrent {@link #close()} could null it and
+     *  turn the send into a swallowed NPE, leaving task-started pending and
+     *  the engine stuck in "preparing". */
+    private void sendStartTask(WebSocket webSocket) {
         try {
             taskId = UUID.randomUUID().toString().replace("-", "");
             JSONObject header = new JSONObject();
@@ -175,14 +185,14 @@ public class ParaformerAsrClient {
 
             String msg = envelope.toString();
             debug.log("ASR", "start-task payload: " + msg);
-            ws.send(msg);
+            webSocket.send(msg);
             debug.log("ASR", "Paraformer start-task sent (model=" + model + ")");
         } catch (Throwable t) {
             debug.log("ASR", "Paraformer start-task ex: " + t.getMessage());
         }
     }
 
-    private void sendFinishTask() {
+    private void sendFinishTask(WebSocket webSocket) {
         try {
             JSONObject header = new JSONObject();
             header.put("streaming", "duplex");
@@ -196,7 +206,7 @@ public class ParaformerAsrClient {
             envelope.put("header", header);
             envelope.put("payload", payload);
 
-            ws.send(envelope.toString());
+            webSocket.send(envelope.toString());
         } catch (Throwable t) {
             debug.log("ASR", "sendFinishTask ex: " + t.getMessage());
         }
@@ -212,7 +222,7 @@ public class ParaformerAsrClient {
             JSONObject header = env.optJSONObject("header");
             JSONObject payload = env.optJSONObject("payload");
             if (header == null) return;
-            String action = header.optString("event", "");
+            String action = Json.optString(header, "event", "");
             switch (action) {
                 case "task-started":
                     taskStarted = true;
@@ -238,7 +248,7 @@ public class ParaformerAsrClient {
                                 if (arr.length() > 0) sent = arr.optJSONObject(arr.length() - 1);
                             }
                             if (sent != null) {
-                                String sentText = sent.optString("text", "");
+                                String sentText = Json.optString(sent, "text", "");
                                 if (!sentText.isEmpty()) {
                                     double endTime = sent.optDouble("end_time", -1.0);
                                     boolean sentenceEnd = sent.optBoolean("sentence_end", false);
@@ -284,9 +294,9 @@ public class ParaformerAsrClient {
                     }
                     break;
                 case "task-failed":
-                    String errMsg = (payload != null) ? payload.optString("message",
+                    String errMsg = (payload != null) ? Json.optString(payload, "message",
                             "task-failed") : "task-failed";
-                    String errCode = header.optString("error_code", "");
+                    String errCode = Json.optString(header, "error_code", "");
                     debug.log("ASR", "Paraformer server error: " + errCode + " " + errMsg);
                     if (listener != null) listener.onError(errCode + " " + errMsg);
                     break;
@@ -302,7 +312,7 @@ public class ParaformerAsrClient {
         @Override public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
             open = true;
             debug.log("ASR", "Paraformer WS open");
-            sendStartTask();
+            sendStartTask(webSocket);
             // onReady is fired when task-started comes back, not here —
             // the user-visible "listening" state only makes sense once
             // the server has acknowledged our session.

@@ -56,21 +56,27 @@ public class QwenOmniRealtimeClient {
 
     private final ConfigStore config;
     private final DebugLogger debug;
-    private final OkHttpClient http;
+
+    /** Process-wide shared client (see {@link QwenMtClient#SHARED_HTTP}).
+     *  WebSocket connections are per-instance; only the dispatcher/pool is
+     *  shared. Never shut down. */
+    private static final OkHttpClient SHARED_HTTP = new OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)   // keep the socket alive
+            .readTimeout(0, TimeUnit.MILLISECONDS) // no read timeout for a stream
+            .build();
 
     private WebSocket ws;
     private Listener listener;
     private final StringBuilder turnBuf = new StringBuilder();
     private volatile boolean open;
+    /** True once onReady has fired, so flushTurn() in onClosing/onFailure
+     *  only ships a turn that the caller actually started capturing for. */
+    private volatile boolean ready;
 
     public QwenOmniRealtimeClient(ConfigStore config, DebugLogger debug) {
         this.config = config;
         this.debug = debug;
-        this.http = new OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .pingInterval(20, TimeUnit.SECONDS)   // keep the socket alive
-                .readTimeout(0, TimeUnit.MILLISECONDS) // no read timeout for a stream
-                .build();
     }
 
     public boolean isOpen() { return open; }
@@ -90,7 +96,7 @@ public class QwenOmniRealtimeClient {
                 .build();
 
         debug.log("ASR", "WS connect " + url);
-        ws = http.newWebSocket(req, new Socket());
+        ws = SHARED_HTTP.newWebSocket(req, new Socket());
     }
 
     /** Base64-encode a PCM16 frame and append it to the server input buffer. */
@@ -117,7 +123,12 @@ public class QwenOmniRealtimeClient {
         }
     }
 
-    private void sendSessionUpdate() {
+    /** Send the session.update frame. Takes the {@link WebSocket} from
+     *  {@link #onOpen} rather than reading the mutable {@link #ws} field,
+     *  so a concurrent {@link #close()} (which nulls {@code ws}) can't
+     *  turn this into a swallowed NPE that leaves the session unconfigured
+     *  and onReady forever pending. */
+    private void sendSessionUpdate(WebSocket webSocket) {
         try {
             JSONObject td = new JSONObject();
             td.put("type", "server_vad");
@@ -142,10 +153,21 @@ public class QwenOmniRealtimeClient {
             JSONObject ev = new JSONObject();
             ev.put("type", "session.update");
             ev.put("session", session);
-            ws.send(ev.toString());
+            webSocket.send(ev.toString());
             debug.log("ASR", "session.update sent (server_vad, text, pcm16)");
         } catch (Throwable t) {
             debug.log("ASR", "session.update ex: " + t.getMessage());
+        }
+    }
+
+    /** Ship whatever turn text has accumulated so far, then clear the buffer.
+     *  Used from response.done and from the disconnect paths so a turn in
+     *  flight when the socket dies isn't silently lost. */
+    private void flushTurn() {
+        String result = turnBuf.toString().trim();
+        turnBuf.setLength(0);
+        if (!result.isEmpty() && listener != null) {
+            listener.onResult(result);
         }
     }
 
@@ -154,14 +176,22 @@ public class QwenOmniRealtimeClient {
         JSONObject ev;
         try {
             ev = new JSONObject(text);
-            type = ev.optString("type", "");
+            type = Json.optString(ev, "type", "");
         } catch (Throwable t) {
             debug.log("ASR", "bad event: " + t.getMessage());
             return;
         }
         switch (type) {
             case "session.updated":
+                // Server acked our session.update — NOW it's safe to start
+                // pushing audio. Firing onReady in onOpen (before the ack)
+                // sent input_audio_buffer.append frames before the VAD/pcm16
+                // config was applied.
                 debug.log("ASR", "session.updated");
+                if (!ready && listener != null) {
+                    ready = true;
+                    listener.onReady();
+                }
                 break;
             case "input_audio_buffer.speech_started":
                 debug.log("ASR", "speech_started");
@@ -174,26 +204,24 @@ public class QwenOmniRealtimeClient {
             case "response.text.delta":
             case "response.output_text.delta":
             case "response.audio_transcript.delta":
-                turnBuf.append(ev.optString("delta", ""));
+                turnBuf.append(Json.optString(ev, "delta", ""));
                 if (listener != null) listener.onDelta(turnBuf.toString());
                 break;
             // Turn finished — emit whatever we accumulated. Prefer an explicit
             // full "text" if the server provided one on the *.done event.
             case "response.text.done":
             case "response.output_text.done": {
-                String full = ev.optString("text", "");
+                String full = Json.optString(ev, "text", "");
                 if (!full.isEmpty()) { turnBuf.setLength(0); turnBuf.append(full); }
                 break;
             }
             case "response.done": {
-                String result = turnBuf.toString().trim();
-                turnBuf.setLength(0);
-                if (!result.isEmpty() && listener != null) listener.onResult(result);
+                flushTurn();
                 break;
             }
             case "error": {
                 String msg = ev.optJSONObject("error") != null
-                        ? ev.optJSONObject("error").optString("message", text)
+                        ? Json.optString(ev.optJSONObject("error"), "message", text)
                         : text;
                 debug.log("ASR", "server error: " + msg);
                 if (listener != null) listener.onError(msg);
@@ -209,8 +237,10 @@ public class QwenOmniRealtimeClient {
         @Override public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
             open = true;
             debug.log("ASR", "WS open");
-            sendSessionUpdate();
-            if (listener != null) listener.onReady();
+            // Send session.update but do NOT fire onReady here — wait for the
+            // server's session.updated ack (handled in handleEvent) so audio
+            // frames aren't pushed before the VAD/pcm16 config is applied.
+            sendSessionUpdate(webSocket);
         }
 
         @Override public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
@@ -220,6 +250,9 @@ public class QwenOmniRealtimeClient {
         @Override public void onClosing(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
             open = false;
             debug.log("ASR", "WS closing " + code + " " + reason);
+            // Server may close mid-turn without sending response.done; ship
+            // whatever we accumulated so the partial translation isn't lost.
+            flushTurn();
         }
 
         @Override public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
@@ -232,6 +265,7 @@ public class QwenOmniRealtimeClient {
             String msg = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
             int code = response != null ? response.code() : -1;
             debug.log("ASR", "WS failure code=" + code + " " + msg);
+            flushTurn();
             if (listener != null) listener.onError("WS " + code + ": " + msg);
         }
     }

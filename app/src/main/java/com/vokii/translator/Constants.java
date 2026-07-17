@@ -19,12 +19,27 @@ public final class Constants {
     public static final String KEY_TEMPERATURE = "temperature";
     public static final String KEY_DEBUG_VISIBLE = "debug_visible";
     public static final String KEY_CASCADE_MODE = "cascade_mode";
+    public static final String KEY_SRC_LANG = "src_lang";
+    public static final String KEY_TGT_LANG = "tgt_lang";
+    public static final String KEY_DISPLAY_MODE = "display_mode";
+    /** Serialized transcript history (JSON array of turns). */
+    public static final String KEY_TRANSCRIPT = "transcript_history";
 
     /** Default sampling temperature. */
     public static final float DEFAULT_TEMPERATURE = 0.3f;
 
     /** Whether the bottom debug panel is visible by default. */
     public static final boolean DEFAULT_DEBUG_VISIBLE = false;
+
+    /** Default source / target languages for the cascade MT prompt.
+     *  "auto" = the LLM auto-detects the spoken language (Chinese or
+     *  English) and outputs both labels regardless. tgt "en" is the
+     *  canonical "second" language for display pairing. */
+    public static final String DEFAULT_SRC_LANG = "auto";
+    public static final String DEFAULT_TGT_LANG = "en";
+
+    /** Default display mode. Values: "both" | "source_only" | "target_only". */
+    public static final String DEFAULT_DISPLAY_MODE = "both";
 
     /** Whether to use the cascade (fun-asr-realtime → qwen-plus) pipeline.
      *  Default ON: tier2 MER cuts 0.1436 → 0.0693 (-52% relative to the

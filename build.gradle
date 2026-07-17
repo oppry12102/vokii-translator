@@ -6,16 +6,8 @@ buildscript {
         google()
         mavenCentral()
         gradlePluginPortal()
-        maven { url 'https://developer.huawei.com/repo/' }
     }
     dependencies {
-        // AGP + AGConnect plugin on the same buildscript classpath: the agcp
-        // plugin requires com.android.tools.build:gradle to be resolvable here
-        // (it fails to apply otherwise). agcp processes agconnect-services.json
-        // at build time and injects the ServiceRegistrar metadata that decrypts
-        // client/api_key and feeds it to MLApplication — without it HMS ML Kit
-        // fails with "Please set you app apiKey".
         classpath 'com.android.tools.build:gradle:8.2.2'
-        classpath 'com.huawei.agconnect:agcp:1.9.1.301'
     }
 }

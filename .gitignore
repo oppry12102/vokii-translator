@@ -19,7 +19,7 @@ captures/
 
 # --- Secrets ---
 # local.properties is the only secret-bearing file in the repo. It is
-# already gitignored above. The DEEPSEEK_API_KEY it contains is read at
+# already gitignored above. The QWEN_API_KEY it contains is read at
 # configuration time by app/build.gradle and compiled into BuildConfig.
 # Anyone who decompiles the APK can recover it; that is the trade-off
 # for shipping a working default with the binary. Rotate the key if the
@@ -31,3 +31,7 @@ app/build/generated/agconnect-services.json
 # --- OS noise ---
 .DS_Store
 Thumbs.db
+
+# --- Python (eval harness) ---
+__pycache__/
+*.pyc

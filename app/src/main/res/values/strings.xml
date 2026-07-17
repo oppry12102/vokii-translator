@@ -1,8 +1,21 @@
 <resources>
     <string name="app_name">Vokii</string>
     <string name="title_settings">Settings</string>
+    <string name="settings_intro">All other preferences are voice-controlled. Say "help" or "你能做什么" to see the available commands.</string>
     <string name="hint_speak">Tap the mic to start</string>
     <string name="hint_listening">Listening…</string>
+    <string name="hint_paused">Paused (mic muted)</string>
+    <string name="action_reset">Reset all to defaults</string>
+    <string name="section_api">API</string>
+    <string name="section_translation">Translation</string>
+    <string name="section_engine">Engine</string>
+    <string name="section_debug">Debug</string>
+    <string name="setting_api_key_hint_long">Leave blank to use the bundled default. Used for the DashScope Qwen LLM endpoint.</string>
+    <string name="setting_source_lang_hint">Auto-detect lets the LLM pick Chinese or English automatically. Fixed languages constrain the MT prompt.</string>
+    <string name="setting_target_lang_hint">The second language for the bilingual output labels. In auto source mode this is also the "other language" the LLM translates to.</string>
+    <string name="setting_display_mode_hint">Both shows two columns, source/target only shows one.</string>
+    <string name="setting_cascade_hint">ON = Paraformer ASR + qwen-plus MT (best quality, supports voice commands). OFF = joint Qwen-Omni Realtime (no voice commands).</string>
+    <string name="setting_debug_hint">Show the rolling log panel with ASR/MT/CMD events at the bottom of the main screen.</string>
     <string name="hint_thinking">Translating…</string>
     <string name="hint_preparing">Preparing ASR…</string>
     <string name="label_debug">Debug log</string>
@@ -14,6 +27,39 @@
     <string name="setting_api_key_status_user">Using custom key</string>
     <string name="setting_debug_enabled">Debug</string>
     <string name="setting_cascade_enabled">Cascade</string>
+    <string name="setting_source_lang">Source language</string>
+    <string name="setting_target_lang">Target language</string>
+    <string name="setting_display_mode">Display mode</string>
+    <string-array name="lang_options">
+        <item>Auto-detect (中英)</item>
+        <item>Chinese (zh)</item>
+        <item>English (en)</item>
+        <item>Japanese (ja)</item>
+        <item>Korean (ko)</item>
+        <item>French (fr)</item>
+        <item>German (de)</item>
+        <item>Spanish (es)</item>
+    </string-array>
+    <string-array name="lang_codes">
+        <item>auto</item>
+        <item>zh</item>
+        <item>en</item>
+        <item>ja</item>
+        <item>ko</item>
+        <item>fr</item>
+        <item>de</item>
+        <item>es</item>
+    </string-array>
+    <string-array name="display_mode_options">
+        <item>Both languages</item>
+        <item>Source only</item>
+        <item>Target only</item>
+    </string-array>
+    <string-array name="display_mode_keys">
+        <item>both</item>
+        <item>source_only</item>
+        <item>target_only</item>
+    </string-array>
     <string name="permission_required">Microphone permission is required.</string>
     <string name="err_recording">Failed to start audio recorder.</string>
     <string name="err_asr_unavailable">On-device ASR unavailable on this device.</string>

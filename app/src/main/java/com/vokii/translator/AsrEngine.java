@@ -17,6 +17,10 @@ public interface AsrEngine {
         void onFinal(String text);
         void onError(int code, String message);
         void onReady();
+        /** Voice control command(s) detected by the MT LLM's tool_use.
+         *  Default empty so the joint Qwen-Omni path (no MT LLM) needs no
+         *  override. Only {@link CascadeEngine} implements this. */
+        default void onCommand(java.util.List<ToolCall> calls) {}
     }
 
     void start(Callback callback);

@@ -1,0 +1,231 @@
+package com.vokii.translator;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.Locale;
+
+/**
+ * Builds the system prompt and tool schema for the MT LLM call.
+ *
+ * <p>When a {@link ToolRegistry} is supplied, the system prompt is
+ * extended with a command-recognition paragraph that instructs the LLM
+ * to detect voice commands alongside the normal translation work, and
+ * the registry's tool schemas are returned by
+ * {@link #buildToolsJson(ToolRegistry)} for the request body.
+ *
+ * <h2>Why dynamic labels</h2>
+ * The labels the model emits ({@code ZH: ..} / {@code JA: ..} / etc.) are
+ * the contract {@link TurnParser} consumes. Hardcoding them to
+ * {@code ZH}/{@code EN} in the LLM is the bug Phase 0 fixes — instead we
+ * emit whatever the current session pair is.
+ *
+ * <h2>Style suffix</h2>
+ * Free-form style modifiers from {@link SessionConfig#stylePrompt()} are
+ * appended as a single sentence. Empty/blank = no style line.
+ *
+ * <h2>Command recognition (Phase 1)</h2>
+ * The model is told:
+ * <ul>
+ *   <li>A "pure control command" utterance (e.g. "下面改成中日翻译")
+ *       must emit tool_call(s) and NO translation lines.</li>
+ *   <li>A "mixed" utterance (command + content) must emit tool_call(s)
+ *       and STILL output NO translation lines — the command is meant
+ *       to take effect on the NEXT utterance, so translating the
+ *       current one is misleading (it'd appear under the old pair).</li>
+ *   <li>Plain content must be translated normally; no tool_call.</li>
+ *   <li><b>Default to translation when uncertain</b> — false positives
+ *       on commands are worse than missed commands (the user can
+ *       re-say the command; a wrongly-mutated setting is annoying).</li>
+ * </ul>
+ */
+public final class MtPromptBuilder {
+
+    private MtPromptBuilder() {}
+
+    /** Build the system prompt for the current session. Pass {@code null}
+     *  for {@code registry} to disable tool_use (translation-only mode).
+     *  When {@code ctx.session().sourceLang()} is "auto", the prompt is a
+     *  generic bilingual one: the LLM auto-detects the spoken language
+     *  (Chinese or English) and always emits both labels.
+     *
+     *  The {@code ctx} also contributes a "SESSION CONTEXT" section
+     *  (current state + recent commands + recent utterances) that the
+     *  LLM uses to disambiguate voice commands like "改成中文" or
+     *  "再翻一次" without the user having to repeat the slot being
+     *  changed. */
+    public static String buildSystemPrompt(SessionContext ctx, ToolRegistry registry) {
+        SessionConfig session = ctx.session();
+        String src = session.sourceLang();
+        String tgt = session.targetLang();
+        String srcName = displayName(src);
+        String tgtName = displayName(tgt);
+        String srcLabel = labelFor(src);
+        String tgtLabel = labelFor(tgt);
+
+        // CORE PRINCIPLE: the source-language line is the VERBATIM transcript
+        // of what the user said. The other line is the translation, which can
+        // be styled freely. Voice commands control translation only, never
+        // the transcription itself.
+        StringBuilder sb = new StringBuilder();
+        sb.append("CORE PRINCIPLE — VERBATIM SOURCE + FREE TRANSLATION:\n")
+          .append("1. The line matching the SPOKEN language must be EXACTLY what ")
+          .append("the user said — FROM THE VERY FIRST WORD to the last. ")
+          .append("Preserve every word, every '呃'/'嗯'/'那个' filler, every ")
+          .append("repetition, every grammatical error, every slang, every ")
+          .append("non-standard expression. Do NOT correct, improve, paraphrase, ")
+          .append("or 'clean up' the source text. If the user said ")
+          .append("'呃那个我今天呃想要吃苹果', output exactly that — NOT ")
+          .append("'我今天想吃苹果'.\n")
+          .append("2. CRITICAL FOR CODE-SWITCHING: when the user mixes English ")
+          .append("words inside a Chinese sentence (or vice versa), keep the ")
+          .append("foreign-language words EXACTLY as the user said them. Do NOT ")
+          .append("translate them. This applies at the START of the sentence too ")
+          .append("— if the user starts in English and switches to Chinese, the ")
+          .append("English opening must remain English. Example: user says ")
+          .append("'Alright. 是这样的，好像怎么说，是因为社会的快速发展才使我们 ")
+          .append("had to make some innovation' → ZH: must contain the verbatim ")
+          .append("'Alright. 是这样的...' including the English 'Alright. had to ")
+          .append("make some innovation' fragments, NOT '好的。是这样的...'.\n")
+          .append("3. The OTHER line is the translation. It can be styled per the ")
+          .append("user's preferences (formal, casual, concise, literary, etc.).\n")
+          .append("4. Voice commands (e.g. '下面改成中日翻译', '翻译得更正式一些') ")
+          .append("are CONTROL COMMANDS that adjust translation behavior. They ")
+          .append("are NOT part of the source text. They do NOT affect the ")
+          .append("transcription line in any way.\n\n");
+        if ("auto".equalsIgnoreCase(src)) {
+            sb.append("You are a real-time bilingual interpreter. The user may speak ")
+              .append("either ").append(displayName("zh")).append(" or ").append(displayName("en"))
+              .append(" — auto-detect the spoken language.\n\n")
+              .append("OUTPUT FORMAT — TWO LINES, ONE LABEL EACH:\n")
+              .append("Line 1: the VERBATIM SOURCE TRANSCRIPT, prefixed with the matching label:\n")
+              .append("  - If user spoke Chinese, prefix with 'ZH: '\n")
+              .append("  - If user spoke English, prefix with 'EN: '\n")
+              .append("Line 2: the TRANSLATION into the OTHER language, prefixed with the OTHER label:\n")
+              .append("  - If source was Chinese, line 2 is 'EN: <English translation>'\n")
+              .append("  - If source was English, line 2 is 'ZH: <Chinese translation>'\n\n")
+              .append("RULE: line 1 is always the VERBATIM source. The label on line 1 ")
+              .append("must match the language of the source. Line 2 is the translation ")
+              .append("with the OTHER language's label.\n\n")
+              .append("EXAMPLES:\n")
+              .append("User says '我去学校' (Chinese) →\n")
+              .append("ZH: 我去学校\n")
+              .append("EN: I go to school\n\n")
+              .append("User says 'i go to school' (English) →\n")
+              .append("EN: i go to school\n")
+              .append("ZH: 我去学校\n\n")
+              .append("User says '呃那个我今天呃想吃苹果' (Chinese with fillers) →\n")
+              .append("ZH: 呃那个我今天呃想吃苹果\n")
+              .append("EN: Um, that, um, I want to eat an apple today\n\n")
+              .append("Use no labels other than 'ZH:' and 'EN:'. ")
+              .append("No extra commentary, no markdown, no apologies.");
+        } else {
+            sb.append("You are a real-time interpreter translating from ")
+              .append(srcName).append(" to ").append(tgtName).append(". ")
+              .append("Output BOTH lines for every utterance in this EXACT format:\n")
+              .append(srcLabel).append(" <verbatim ").append(srcName).append(" source>\n")
+              .append(tgtLabel).append(" <").append(tgtName).append(" translation of that source>\n\n")
+              .append("CRITICAL: the ").append(srcLabel).append(" line is the VERBATIM ")
+              .append("transcript of what the user said (preserve every word, every ")
+              .append("'呃'/'嗯'/'那个' filler, every repetition, every grammatical ")
+              .append("error, every slang). The ").append(tgtLabel).append(" line is the ")
+              .append("translation, which may be styled per the user's preference.\n\n")
+              .append("Use no labels other than '").append(srcLabel).append("' and '")
+              .append(tgtLabel).append("'. ")
+              .append("No extra commentary, no markdown, no apologies.");
+        }
+
+        String style = session.stylePrompt();
+        if (style != null && !style.isEmpty()) {
+            sb.append("\n\nStyle preference: ").append(style).append(".");
+        }
+
+        if (registry != null && !registry.names().isEmpty()) {
+            sb.append("\n\nThe user can occasionally issue SYSTEM CONTROL COMMANDS ")
+              .append("to change how the interpreter behaves, such as switching ")
+              .append("languages, hiding one of the language columns, opening the ")
+              .append("debug panel, pausing or resuming the microphone, copying ")
+              .append("the transcript to clipboard, summarizing the session, ")
+              .append("re-translating the last turn with the current style, ")
+              .append("adjusting the log verbosity, or changing the translation ")
+              .append("look-and-feel (style and/or temperature via ")
+              .append("set_translation_mode). The mode tool accepts BOTH 'style' ")
+              .append("and 'temperature' as optional fields — pass whichever the ")
+              .append("user mentioned, omit the rest. ")
+              .append("For PAUSING/RESUMING the mic, use toggle_mic with ")
+              .append("{paused: true} or {paused: false} — the user may say '暂停' ")
+              .append("or 'mute' (→ paused:true) or '继续' or 'unmute' (→ ")
+              .append("paused:false). IMPORTANT: do not confuse the literal word ")
+              .append("'mode' (模式) with the translation-mode tool — only use ")
+              .append("it when the user clearly asks to change the STYLE or ")
+              .append("TEMPERATURE of the translation, not when they say ")
+              .append("'切换到普通模式' (which means switch to the default ")
+              .append("pipeline, i.e. toggle_cascade). Detect these commands ")
+              .append("ANYWHERE in the utterance — at the start, middle, or end — ")
+              .append("and call the matching tool with a \"trigger_text\" argument that ")
+              .append("captures the original command phrase. Rules:\n")
+              .append("1. If the utterance is a PURE control command, call the ")
+              .append("matching tool and output NO translation lines (not even ")
+              .append("empty ones).\n")
+              .append("2. If the utterance MIXES a control command with content to ")
+              .append("translate (command at the start, end, or anywhere in between), ")
+              .append("STILL call the matching tool and output NO translation lines — ")
+              .append("the command takes effect on the NEXT utterance, so translating ")
+              .append("the current one would mislead the user. This applies even if the ")
+              .append("content is very long; the command always wins.\n")
+              .append("3. If the utterance is plain content, translate it normally ")
+              .append("and DO NOT call any tool.\n")
+              .append("4. When unsure whether an utterance is a command, do NOT ")
+              .append("call a tool — translate it normally. False-positive tool ")
+              .append("calls are far worse than missed commands.");
+        }
+
+        // Append live session context (current state + recent commands +
+        // recent utterances) so the LLM can disambiguate commands like
+        // "改成中文" (change what slot?) or "再翻一次" (re-translate what?)
+        // against prior state.
+        sb.append(ctx.buildPromptSection());
+
+        return sb.toString();
+    }
+
+    /** Phase 0 backwards-compat overload. */
+    public static String buildSystemPrompt(SessionContext ctx) {
+        return buildSystemPrompt(ctx, null);
+    }
+
+    /** Tools JSON array for the LLM request. Returns null when no
+     *  registry is supplied (translation-only mode). */
+    public static JSONArray buildToolsJson(ToolRegistry registry) {
+        if (registry == null || registry.names().isEmpty()) return null;
+        return registry.toJsonArray();
+    }
+
+    /** Phase 0 backwards-compat overload. */
+    public static JSONArray buildToolsJson() {
+        return null;
+    }
+
+    private static String labelFor(String lang) {
+        if (lang == null || lang.isEmpty()) return "";
+        int dash = lang.indexOf('-');
+        String primary = dash >= 0 ? lang.substring(0, dash) : lang;
+        return primary.toUpperCase(Locale.ROOT) + ":";
+    }
+
+    private static String displayName(String lang) {
+        if (lang == null) return "the source language";
+        switch (lang.toLowerCase(Locale.ROOT)) {
+            case "zh": return "Mandarin Chinese";
+            case "en": return "English";
+            case "ja": return "Japanese";
+            case "ko": return "Korean";
+            case "fr": return "French";
+            case "de": return "German";
+            case "es": return "Spanish";
+            case "ru": return "Russian";
+            case "ar": return "Arabic";
+            default:  return lang;
+        }
+    }
+}
