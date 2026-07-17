@@ -38,35 +38,44 @@ import okio.BufferedSource;
  *   Body: { "model": "qwen-plus", "stream": true, "messages": [...] }
  * </pre>
  *
- * <p><b>Why {@code qwen-plus} and not {@code qwen-mt-plus}.</b>
- * {@code qwen-mt-plus} is a translation-specialised model accessible
- * only through DashScope's <em>native</em> SDK ({@code dashscope.Generation.call}),
- * which uses a different request envelope ({@code input.messages},
- * {@code parameters.incremental_output}, {@code result_format="message"})
- * and a different chunk shape ({@code output.choices[0].message.content},
- * no {@code delta} wrapper). The OpenAI-compatible mode used here does
- * not list {@code qwen-mt-plus} in its model catalog — a request for it
- * returns status 200 with an empty body, which surfaces in the app as
- * "empty MT response". {@code qwen-plus} is in the compat catalog,
- * handles the bilingual instruction set, and the eval harness's
- * {@code cascade_step2.py} already uses it with the same URL.
+ * <p><b>Why {@code qwen-turbo} is the default.</b> Measured 2026-07-17
+ * against the OpenAI-compatible endpoint (same utterance, n=5):
+ * qwen-turbo TTFB median 451 ms vs qwen-plus 728 ms — ~280 ms faster
+ * server-side, ~180 ms on-device. For a live translator the MT TTFB is
+ * the residual wait after the user pauses (P0's live caption already
+ * covers the speech window), so the faster model directly cuts perceived
+ * latency. Both emit the {@code ZH:}/{@code EN:} two-line format reliably
+ * (verified on zh, en, and code-switch samples). Translation quality is
+ * out of scope per the project directive (MER is the target, translation
+ * assumed correct via LLM); qwen-plus remains a one-line fallback here if
+ * a user hits a complex-translation case.
+ *
+ * <p><b>Why not {@code qwen-mt-plus}.</b> It's a translation-specialised
+ * model accessible only through DashScope's <em>native</em> SDK
+ * ({@code dashscope.Generation.call}), which uses a different request
+ * envelope ({@code input.messages}, {@code parameters.incremental_output},
+ * {@code result_format="message"}) and a different chunk shape
+ * ({@code output.choices[0].message.content}, no {@code delta} wrapper).
+ * The OpenAI-compatible mode used here does not list {@code qwen-mt-plus}
+ * in its model catalog — a request for it returns status 200 with an empty
+ * body, which surfaces as "empty MT response". qwen-turbo / qwen-plus are
+ * in the compat catalog.
  *
  * <h2>Trade-offs</h2>
  * <ul>
- *   <li><b>Latency</b>: chat-completion adds an extra hop (~300 ms TTFB
- *       warm, more cold) versus Qwen-Omni's joint model. Acceptable
- *       because the MER win on step 1 is the dominant cost/quality
- *       lever — see REPORT.cascade.step1.md.</li>
- *   <li><b>Quality</b>: qwen-plus is a general LLM, not an MT-tuned
- *       model. Translation quality is slightly below qwen-mt-plus on
- *       code-switch boundaries but well within "shippable" range for
- *       the live-translator UX, and the two-line ZH:/EN: prompt format keeps
- *       it on-spec.</li>
+ *   <li><b>Latency</b>: chat-completion adds an extra hop (~0.5 s TTFB
+ *       warm) versus Qwen-Omni's joint model. Acceptable because the MER
+ *       win on step 1 is the dominant cost/quality lever — see
+ *       REPORT.cascade.step1.md. qwen-turbo minimises this hop.</li>
+ *   <li><b>Quality</b>: qwen-turbo is a smaller general LLM, not MT-tuned.
+ *       Translation quality is slightly below qwen-plus on complex /
+ *       code-switch boundaries but the two-line ZH:/EN: prompt format
+ *       keeps it on-spec (verified 2026-07-17).</li>
  *   <li><b>Streaming</b>: SSE deltas are emitted as the model generates.
  *       {@link Listener#onDelta(String)} fires for each delta so the UI
  *       gets live ZH/EN updates during the MT turn.</li>
- *   <li><b>Cost</b>: ~30 % of Qwen-Omni per minute; total cascade is
- *       ~1.3 × the joint path.</li>
+ *   <li><b>Cost</b>: qwen-turbo is cheaper than qwen-plus; total cascade
+ *       is ~1.3 × the joint path.</li>
  * </ul>
  *
  * <h2>Build note</h2>
@@ -78,10 +87,11 @@ import okio.BufferedSource;
 public class QwenMtClient {
 
     /**
-     * Default MT model. {@code qwen-plus} via the OpenAI-compatible mode
-     * (URL below); see class docs for why not {@code qwen-mt-plus}.
+     * Default MT model. {@code qwen-turbo} via the OpenAI-compatible mode
+     * (URL below) — latency-optimised (~280 ms faster TTFB than qwen-plus,
+     * measured 2026-07-17); see class docs for why not {@code qwen-mt-plus}.
      */
-    public static final String DEFAULT_MODEL = "qwen-plus";
+    public static final String DEFAULT_MODEL = "qwen-turbo";
 
     /** Fallback prompt used only when the caller does not pass one
      *  explicitly. Kept for tests and ad-hoc invocations; production

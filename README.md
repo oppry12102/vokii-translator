@@ -23,7 +23,7 @@ mic PCM (16 kHz, mono, 20 ms frames)
   │            one {sentence_id, text, sentence_end} JSON envelope.
   │            ──► verbatim transcript (zh + en mixed)
   │
-  └─ step 2 ─► qwen-plus chat completion
+  └─ step 2 ─► qwen-turbo chat completion
                (POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
                 with `stream: true`, SSE `{choices:[{delta:{content:..}}]}` frames)
                prompt: emit two-line `ZH:` / `EN:` pair from verbatim
@@ -85,7 +85,7 @@ entries instead.
 
 Besides translating speech, Vokii listens for natural-language control
 commands and runs them as LLM tool calls — no Settings taps needed. The
-MT model (`qwen-plus`) is given the live session state plus a tool
+MT model (`qwen-turbo`) is given the live session state plus a tool
 catalog; when the user says something that's a control intent rather
 than a phrase to translate, it emits `tool_calls` instead of a
 translation. Examples (Chinese or English both work):
@@ -200,7 +200,7 @@ See `tools/eval/README.md` for the full driver list and
 │       ├── ConfigStore.java     #   API key + cascade + debug toggles
 │       ├── CascadeEngine.java   #   ◄── step 1 dispatch + step 2 dispatch
 │       ├── ParaformerAsrClient.java  # ◄── DashScope ASR WebSocket
-│       ├── QwenMtClient.java    #   ◄── qwen-plus chat completion (SSE)
+│       ├── QwenMtClient.java    #   ◄── qwen-turbo chat completion (SSE)
 │       ├── QwenOmniEngine.java  #   joint path (Settings → off)
 │       ├── QwenOmniRealtimeClient.java
 │       ├── MtRunner.java        #   shared MT executor + client factory

@@ -95,10 +95,48 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
+        <!-- Debug panel visibility. Also voice-controlled (toggle_debug /
+             "打开调试"), but surfaced here because typing the voice command
+             every time you want the log panel is cumbersome. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_debug_enabled"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/setting_debug_hint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/switch_debug"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
         <!-- No reset button — no other settings to reset. -->
-        <!-- Other toggles (debug, display mode, languages, mic, style, log
-             level, summarize, re-translate, copy) are all voice-controlled.
-             Say "help" or "你能做什么" to see the full command catalog. -->
+        <!-- Display mode, languages, mic, style, log level, summarize,
+             re-translate, copy remain voice-controlled. Say "help" or
+             "你能做什么" to see the full command catalog. -->
 
     </LinearLayout>
 </ScrollView>

@@ -12,7 +12,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 /**
  * Minimal configuration screen. The design intent is "极简": only
- * fields that have no voice equivalent appear here.
+ * fields that have no voice equivalent, or that are too cumbersome to
+ * reach by voice, appear here.
  *
  *  - API key: a credential, not a runtime toggle. Persisted, hidden
  *    by default so the bundled value isn't accidentally overwritten.
@@ -20,11 +21,14 @@ import androidx.appcompat.app.AppCompatActivity;
  *    setting up. After that, switching paths is also possible via the
  *    cascade=false/true voice commands (toggle_cascade), but the user
  *    keeps this control here as a safety net.
+ *  - Debug panel: also voice-controlled (toggle_debug / "打开调试"),
+ *    but typed here too because issuing the voice command every time
+ *    you want the log panel is tedious.
  *
- * Everything else (source/target/display mode, debug visibility, mic
- * pause, log level, style, temperature, summary, re-translate, export)
- * is voice-controlled. The full command catalog is returned by the
- * list_commands tool — say "你能做什么" or "help" to see it.
+ * Everything else (source/target/display mode, mic pause, log level,
+ * style, temperature, summary, re-translate, export) is voice-controlled.
+ * The full command catalog is returned by the list_commands tool — say
+ * "你能做什么" or "help" to see it.
  *
  * Settings auto-save when the user navigates back. There is no Save
  * button (the AndroidX back dispatcher routes toolbar-back and system-
@@ -35,6 +39,7 @@ public class SettingsActivity extends AppCompatActivity {
     private ConfigStore config;
     private EditText inputApiKey;
     private Switch switchCascade;
+    private Switch switchDebug;
     private TextView apiKeyStatus;
 
     @Override
@@ -47,9 +52,11 @@ public class SettingsActivity extends AppCompatActivity {
 
         inputApiKey   = findViewById(R.id.input_api_key);
         switchCascade = findViewById(R.id.switch_cascade);
+        switchDebug   = findViewById(R.id.switch_debug);
         apiKeyStatus  = findViewById(R.id.api_key_status);
 
         switchCascade.setChecked(config.isCascadeMode());
+        switchDebug.setChecked(config.isDebugVisible());
 
         // API key: blank by default to avoid revealing the bundled value.
         // Show the user's own value if they've previously typed one.
@@ -77,6 +84,7 @@ public class SettingsActivity extends AppCompatActivity {
     private void persistAndFinish() {
         config.setApiKey(inputApiKey.getText().toString());
         config.setCascadeMode(switchCascade.isChecked());
+        config.setDebugVisible(switchDebug.isChecked());
         refreshApiKeyLabel();
         finish();
     }

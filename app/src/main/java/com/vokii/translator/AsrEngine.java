@@ -21,6 +21,14 @@ public interface AsrEngine {
          *  Default empty so the joint Qwen-Omni path (no MT LLM) needs no
          *  override. Only {@link CascadeEngine} implements this. */
         default void onCommand(java.util.List<ToolCall> calls) {}
+        /** Live verbatim ASR partial for the sentence currently being spoken
+         *  — i.e. the raw transcript BEFORE MT runs. Only the cascade engine
+         *  fires this (the joint engine's {@link #onPartial} already streams
+         *  translation). Surfaces it to the UI as a "live caption" line so
+         *  the user sees text while speaking instead of waiting for the
+         *  sentence-final commit + MT TTFB. Default empty so other engines
+         *  need no override. */
+        default void onPartialTranscript(String text) {}
     }
 
     void start(Callback callback);

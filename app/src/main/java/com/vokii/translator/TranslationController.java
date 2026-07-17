@@ -41,6 +41,11 @@ public class TranslationController {
         /** Voice control command(s) emitted by the MT LLM's tool_use.
          *  Default empty so the joint Qwen-Omni path needs no override. */
         default void onCommand(java.util.List<ToolCall> calls) {}
+        /** Live verbatim ASR partial (cascade only) — raw transcript before
+         *  MT. Lets the UI show a "live caption" line while the user is
+         *  still speaking, so first text arrives at ASR TTFB (~0.4 s) rather
+         *  than after sentence-final + MT TTFB. */
+        default void onPartialTranscript(String text) {}
         /** Something failed. */
         void onError(String where, int code, String message);
     }
@@ -92,6 +97,12 @@ public class TranslationController {
                 main.post(() -> {
                     if (!active.get()) return;
                     listener.onCommand(calls);
+                });
+            }
+            @Override public void onPartialTranscript(String text) {
+                main.post(() -> {
+                    if (!active.get()) return;
+                    listener.onPartialTranscript(text);
                 });
             }
         });

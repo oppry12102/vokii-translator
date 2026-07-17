@@ -41,7 +41,7 @@ public final class Constants {
     /** Default display mode. Values: "both" | "source_only" | "target_only". */
     public static final String DEFAULT_DISPLAY_MODE = "both";
 
-    /** Whether to use the cascade (fun-asr-realtime → qwen-plus) pipeline.
+    /** Whether to use the cascade (fun-asr-realtime → qwen-turbo) pipeline.
      *  Default ON: tier2 MER cuts 0.1436 → 0.0693 (-52% relative to the
      *  joint Qwen-Omni path) and median TTFB is 6× faster on tier1
      *  (cascade_latency.py n=30). Toggle from Settings if the user

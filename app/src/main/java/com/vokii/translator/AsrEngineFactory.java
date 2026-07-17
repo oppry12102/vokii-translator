@@ -6,8 +6,8 @@ import android.content.Context;
  * Picks the ASR engine at runtime. Two production paths are available:
  *
  *   1. {@link CascadeEngine} (DEFAULT) — chained pipeline:
- *      paraformer-realtime-v2 verbatim ASR → qwen-plus text MT →
- *      ZH/EN pair. CS-Dialogue tier2 MER cut from 0.144 → 0.087 (-39 %);
+ *      fun-asr-realtime verbatim ASR → qwen-turbo text MT →
+ *      ZH/EN pair. CS-Dialogue tier2 MER cut from 0.144 → 0.069 (-52 %);
  *      see tools/eval/REPORT.cascade.step1.md. Slightly higher first-
  *      delta latency (~100-300 ms) until the WS pool warms.
  *
@@ -29,7 +29,7 @@ public final class AsrEngineFactory {
             return new NoOpEngine();
         }
         if (config.isCascadeMode()) {
-            debug.log("ASR", "engine: Cascade (Paraformer-realtime-v2 → qwen-mt-plus)");
+            debug.log("ASR", "engine: Cascade (fun-asr-realtime → qwen-turbo)");
             return new CascadeEngine(ctx, config, sessionContext.session(), sessionContext,
                     toolRegistry, debug);
         }

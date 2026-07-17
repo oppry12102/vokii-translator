@@ -97,6 +97,10 @@ public class CascadeEngine implements AsrEngine {
      *  completion (wasting bandwidth) after the user tapped stop. Volatile:
      *  written on the MT worker, cancelled from the UI thread in stop(). */
     private volatile QwenMtClient currentMt;
+    /** Logs "asr_first_partial" once per turn cycle (reset in translateTurn).
+     *  Race with the WS-thread onDelta is harmless — at worst a duplicate or
+     *  missed log line. */
+    private volatile boolean loggedAsrPartial;
     /** Process-wide single-thread MT executor shared with re-translate /
      *  summarize (see {@link MtRunner}). Only one engine is ever active at
      *  a time (reconcileEngineIfNeeded refuses to hot-swap while listening),
@@ -119,7 +123,7 @@ public class CascadeEngine implements AsrEngine {
         this.debug = debug;
     }
 
-    @Override public String name() { return "Cascade(Paraformer→qwen-mt-plus)"; }
+    @Override public String name() { return "Cascade(fun-asr→qwen-turbo)"; }
 
     @Override public boolean isStarted() { return started; }
 
@@ -152,14 +156,24 @@ public class CascadeEngine implements AsrEngine {
                 startCapture();
                 cb.onReady();
             }
-            /** A partial verbatim transcript. NOT surfaced to the UI —
-             *  raw transcript alone is not useful to the user. We wait
-             *  for the turn commit before forwarding to MT. */
+            /** A partial verbatim transcript for the sentence in flight.
+             *  Forwarded to the UI as a "live caption" so the user sees
+             *  text while speaking — first text lands at ASR TTFB (~0.4 s)
+             *  instead of after the sentence-final commit + MT TTFB. The
+             *  translation card replaces this line once MT streams. */
             @Override public void onDelta(String turnText) {
-                // no-op; step 1 deltas are noise to the UI.
+                if (!started || turnText == null || turnText.isEmpty()) return;
+                if (!loggedAsrPartial) {
+                    loggedAsrPartial = true;
+                    debug.log("LAT", "asr_first_partial (verbatim caption → UI)");
+                }
+                cb.onPartialTranscript(turnText);
             }
             @Override public void onResult(String text) {
                 if (!started || text == null || text.isEmpty()) return;
+                // Show the finalized verbatim immediately too — the MT TTFB
+                // (~0.5 s) after the pause would otherwise be dead time.
+                cb.onPartialTranscript(text);
                 // Hand the verbatim transcript to the MT worker.
                 MtRunner.executor().execute(() -> translateTurn(text));
             }
@@ -179,6 +193,9 @@ public class CascadeEngine implements AsrEngine {
      *  {@link SessionConfig}, so a language change made by voice command
      *  or Settings takes effect on the next turn automatically. */
     private void translateTurn(String verbatim) {
+        final long t0 = System.nanoTime();
+        loggedAsrPartial = false;  // next sentence's first ASR partial will log
+        debug.log("LAT", "mt_start (asr final → mt request)");
         debug.log("MT", "translateTurn len=" + verbatim.length() + " src=" + session.sourceLang()
                 + " tgt=" + session.targetLang());
         String prompt = MtPromptBuilder.buildSystemPrompt(sessionContext, toolRegistry);
@@ -188,7 +205,9 @@ public class CascadeEngine implements AsrEngine {
         currentMt = mt;
         Handler main = new Handler(Looper.getMainLooper());
         mt.translate(verbatim, new QwenMtClient.Listener() {
-            @Override public void onReady() { /* TTFB marker; could log */ }
+            @Override public void onReady() {
+                debug.log("LAT", "mt_ttfb_ms=" + (System.nanoTime() - t0) / 1_000_000);
+            }
             @Override public void onDelta(String turnText) {
                 if (!started) return;
                 // Pass the raw MT output (containing ZH:/EN: labels) to
@@ -203,6 +222,7 @@ public class CascadeEngine implements AsrEngine {
             }
             @Override public void onResult(String text) {
                 if (!started) return;
+                debug.log("LAT", "mt_total_ms=" + (System.nanoTime() - t0) / 1_000_000);
                 main.post(() -> {
                     if (!started) return;
                     cb.onFinal(text);

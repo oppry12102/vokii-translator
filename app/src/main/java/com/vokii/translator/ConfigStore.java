@@ -95,7 +95,7 @@ public class ConfigStore {
         prefs.edit().putBoolean(Constants.KEY_DEBUG_VISIBLE, v).apply();
     }
 
-    /** Cascade (Paraformer→qwen-mt-plus) mode toggle. Default ON (see
+    /** Cascade (fun-asr→qwen-turbo) mode toggle. Default ON (see
      *  {@link Constants#DEFAULT_CASCADE_MODE}) — the cascade pipeline wins
      *  on transcription MER per the CS-Dialogue eval. Users can fall back
      *  to the joint Qwen-Omni path from Settings. */

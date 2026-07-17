@@ -153,7 +153,7 @@ public final class BuiltInTools {
 
         private static final JSONObject SCHEMA = buildSchema(
                 "toggle_cascade",
-                "Switch between the cascade (Paraformer ASR + qwen-plus MT) " +
+                "Switch between the cascade (fun-asr ASR + qwen-turbo MT) " +
                 "and the joint (Qwen-Omni Realtime) pipeline. Takes effect on " +
                 "the NEXT session start — voice commands are only supported " +
                 "in cascade mode.",

@@ -65,6 +65,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private final List<Turn> history = new ArrayList<>();
     /** Latest in-progress turn. Null when no turn is streaming. */
     private Turn currentTurn;
+    /** Live verbatim ASR partial (cascade "live caption"). Staged only while
+     *  no MT card is streaming; cleared by {@link #onStreaming}. Mutually
+     *  exclusive with {@link #currentTurn}. */
+    private String liveAsrPartial;
     /**
      * Generation counter for "scroll to bottom after the next layout". Each
      * renderTranscript that wants to auto-scroll bumps this; the
@@ -272,7 +276,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             return;
         }
         String desiredName = config.isCascadeMode()
-                ? "Cascade(Paraformer→qwen-mt-plus)"
+                ? "Cascade(fun-asr→qwen-turbo)"
                 : "QwenOmniRealtime";
         if (desiredName.equals(currentEngineName)) return;
         debug.log("engine", "rebuilding: " + currentEngineName + " -> " + desiredName);
@@ -344,6 +348,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 return;
             }
             currentTurn = null;
+            liveAsrPartial = null;
             btnMic.setImageResource(R.drawable.ic_mic);
             btnMic.setBackground(getDrawable(R.drawable.bg_mic_recording));
             controller.start();
@@ -378,11 +383,36 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         setStatus(Status.IDLE, getString(R.string.hint_speak));
         btnMic.setImageResource(R.drawable.ic_mic);
         btnMic.setBackground(getDrawable(R.drawable.bg_mic));
+        // Mic stopped — drop any lingering live caption so it doesn't sit on
+        // screen after the user stops talking.
+        if (liveAsrPartial != null) {
+            liveAsrPartial = null;
+            renderTranscript();
+        }
     }
 
-    /** Live partial for the in-progress turn: stage a TRANSLATION turn and
-     *  render history + streaming tail. */
+    /** Live verbatim ASR partial (cascade only). Shown as a "live caption"
+     *  line while the user is speaking so first text lands at ASR TTFB
+     *  (~0.4 s) instead of after sentence-final + MT TTFB. Only staged when
+     *  no MT card is streaming for the current sentence; once MT streams
+     *  ({@link #onStreaming}) the translation replaces the caption. */
+    @Override public void onPartialTranscript(String text) {
+        if (text == null || text.isEmpty()) return;
+        if (currentTurn != null) {
+            // An MT card is already streaming for an earlier sentence — don't
+            // show a second caption alongside it; the next sentence's caption
+            // will stage once that card commits and currentTurn clears.
+            return;
+        }
+        if (text.equals(liveAsrPartial)) return;  // no change → skip re-render
+        liveAsrPartial = text;
+        renderTranscript();
+    }
+
     @Override public void onStreaming(String source, String target, String srcLang, String tgtLang) {
+        // MT is streaming for this sentence — drop the verbatim caption; the
+        // bilingual card takes its place.
+        liveAsrPartial = null;
         currentTurn = Turn.translation(source, target, srcLang, tgtLang);
         renderTranscript();
     }
@@ -498,6 +528,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         Turn lastChip = history.remove(history.size() - 1);
         history.clear();
         currentTurn = null;
+        liveAsrPartial = null;
         history.add(lastChip);
         renderTranscript();
         // Persist the wipe immediately — if the process dies before onPause,
@@ -776,6 +807,13 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         if (currentTurn != null) {
             if (sb.length() > 0) sb.append('\n');
             appendTurn(sb, currentTurn, mode);
+        } else if (liveAsrPartial != null && !liveAsrPartial.isEmpty()) {
+            // No MT card streaming yet — show the live verbatim caption so
+            // the user sees text while speaking (ASR TTFB ≈ 0.4 s vs waiting
+            // for sentence-final + MT TTFB). Replaced by the bilingual card
+            // once MT streams (onStreaming clears liveAsrPartial).
+            if (sb.length() > 0) sb.append('\n');
+            sb.append("› ").append(liveAsrPartial);
         }
         String text = sb.toString().replaceAll("\\s+$", "");
         boolean wasAtBottom = isAtBottom(scrollTranscript);
