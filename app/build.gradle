@@ -83,19 +83,22 @@ android {
     }
 }
 
-// After every Gradle build (any task, including UP-TO-DATE no-ops), copy
-// the generated APKs up to the parent `work/` folder so the artifacts are
-// easy to grab from the host. Uses buildFinished so it runs unconditionally
-// — finalize/UP-TO-DATE task hooks would be skipped on a cached build.
+// After every Gradle build, copy the APKs of the variants that were actually
+// assembled in THIS invocation up to the parent `work/` folder. Gating on the
+// executed task graph matters: an unconditional copy re-uploads a stale APK
+// from days ago with a fresh mtime, making an old release build look current
+// (this actually bit us — release lagged debug by 3 days of commits).
+// dst mtime is set to src's so the artifact's age stays honest.
 gradle.buildFinished { result ->
     try {
-        // The project lives at <work>/vokii; copy APKs directly into <work>.
+        def executed = gradle.taskGraph.allTasks.collect { it.name } as Set
         def workDir = rootProject.projectDir.parentFile
-        ['debug', 'release'].each { variant ->
+        [debug: 'assembleDebug', release: 'assembleRelease'].each { variant, assemble ->
             def src = new File(project.buildDir, "outputs/apk/${variant}/app-${variant}.apk")
-            if (src.exists()) {
+            if (executed.contains(assemble) && src.exists()) {
                 def dst = new File(workDir, "vokii-${variant}.apk")
                 dst.bytes = src.bytes
+                dst.setLastModified(src.lastModified())
                 println "[vokii-copy] vokii-${variant}.apk (${src.length()} bytes) -> ${dst}"
             }
         }
