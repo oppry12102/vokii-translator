@@ -50,14 +50,6 @@
             android:inputType="textPassword"
             android:autofillHints="" />
 
-        <TextView
-            android:id="@+id/api_key_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
-
         <!-- Cascade mode (the only runtime toggle exposed in settings;
              other toggles like debug are voice-controlled) -->
         <LinearLayout
@@ -137,6 +129,31 @@
         <!-- Display mode, languages, mic, style, log level, summarize,
              re-translate, copy remain voice-controlled. Say "help" or
              "你能做什么" to see the full command catalog. -->
+
+        <!-- About / copyright section — title sized like the Debug/Cascade
+             section titles above, details in the smaller hint style. -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="@string/about_title"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/about_developer"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/about_copyright"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
 
     </LinearLayout>
 </ScrollView>

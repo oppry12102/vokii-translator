@@ -40,7 +40,6 @@ public class SettingsActivity extends AppCompatActivity {
     private EditText inputApiKey;
     private Switch switchCascade;
     private Switch switchDebug;
-    private TextView apiKeyStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +52,6 @@ public class SettingsActivity extends AppCompatActivity {
         inputApiKey   = findViewById(R.id.input_api_key);
         switchCascade = findViewById(R.id.switch_cascade);
         switchDebug   = findViewById(R.id.switch_debug);
-        apiKeyStatus  = findViewById(R.id.api_key_status);
 
         switchCascade.setChecked(config.isCascadeMode());
         switchDebug.setChecked(config.isDebugVisible());
@@ -65,7 +63,6 @@ public class SettingsActivity extends AppCompatActivity {
                 && !existing.equals(BuildConfig.DEFAULT_QWEN_API_KEY)) {
             inputApiKey.setText(existing);
         }
-        refreshApiKeyLabel();
 
         // Auto-save on back press.
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -85,16 +82,6 @@ public class SettingsActivity extends AppCompatActivity {
         config.setApiKey(inputApiKey.getText().toString());
         config.setCascadeMode(switchCascade.isChecked());
         config.setDebugVisible(switchDebug.isChecked());
-        refreshApiKeyLabel();
         finish();
-    }
-
-    private void refreshApiKeyLabel() {
-        String active = config.getApiKey();
-        apiKeyStatus.setText(active.isEmpty()
-                ? ""
-                : (active.equals(BuildConfig.DEFAULT_QWEN_API_KEY)
-                        ? getString(R.string.setting_api_key_status_default)
-                        : getString(R.string.setting_api_key_status_user)));
     }
 }
