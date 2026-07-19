@@ -57,7 +57,10 @@
 
     </LinearLayout>
 
-    <!-- Single transcript card (中文 above 英文 per turn) -->
+    <!-- Transcript card: per-turn cards inside a scroll container.
+         Committed cards are immutable — only the bottom "active" card
+         updates in place, and a chase scroller glides (never jumps) to
+         the bottom, so on-screen lines stay put. -->
     <LinearLayout
         android:id="@+id/transcript_card"
         android:layout_width="0dp"
@@ -70,7 +73,7 @@
         app:layout_constraintTop_toBottomOf="@id/top_bar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/mic_area">
+        app:layout_constraintBottom_toTopOf="@id/status_hint">
 
         <ScrollView
             android:id="@+id/scroll_transcript"
@@ -79,16 +82,32 @@
             android:layout_weight="1"
             android:fillViewport="true">
 
-            <TextView
-                android:id="@+id/text_transcript"
+            <LinearLayout
+                android:id="@+id/turns_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="top"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:lineSpacingMultiplier="1.3" />
+                android:orientation="vertical" />
         </ScrollView>
     </LinearLayout>
+
+    <!-- One-line status hint under the transcript. Voice-command results
+         ("» Display → target only") surface here instead of cluttering the
+         conversation text. Fixed height so it never shifts the layout when
+         a message arrives; tap = UNDO the last undoable command. -->
+    <TextView
+        android:id="@+id/status_hint"
+        android:layout_width="0dp"
+        android:layout_height="34dp"
+        android:layout_marginHorizontal="14dp"
+        android:gravity="center_vertical"
+        android:singleLine="true"
+        android:ellipsize="end"
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:background="?attr/selectableItemBackground"
+        app:layout_constraintBottom_toTopOf="@id/mic_area"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 
     <!-- Mic control area -->

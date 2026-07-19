@@ -12,10 +12,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
-import android.view.ViewTreeObserver;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,14 +29,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Real-time translator UI. Single scrollable transcript card with one
- * Chinese line above one English line per turn, plus the mic control and
- * an optional debug panel.
+ * Real-time translator UI. The transcript is a scrollable column of
+ * per-turn cards (one source line above one target line) inside a
+ * LinearLayout, plus a one-line status hint under the card, the mic
+ * control, and an optional debug panel.
  *
- *   microphone → Qwen-Omni Realtime WS → streaming ZH:.. / EN:.. turns
- *                                                  │
- *                                                  ▼
- *                              transcript card (history, scrollable)
+ *   microphone → ASR/MT engines → streaming turns
+ *                                       │
+ *                                       ▼
+ *                     transcript cards — committed cards are immutable;
+ *                     only the bottom "active" card updates. A typewriter
+ *                     reveals the target line char-by-char and a chase
+ *                     scroller glides (never jumps) to the bottom, so
+ *                     on-screen lines stay put while new text arrives.
  */
 public class MainActivity extends AppCompatActivity implements TranslationController.Listener {
 
@@ -52,8 +57,12 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
      *  UNDO Toast. Nulled out when a new tool overwrites it. */
     private CommandResult lastUndoable;
 
-    private TextView textTranscript;
     private ScrollView scrollTranscript;
+    private LinearLayout turnsContainer;
+    /** One-line status hint under the transcript — voice-command results
+     *  ("» Languages → zh↔ja") surface here so settings noise stays out of
+     *  the conversation text. Tappable to UNDO the last undoable command. */
+    private TextView statusHint;
     private TextView statusLabel;
     private View statusDot;
     private ImageButton btnMic;
@@ -61,37 +70,46 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private TextView debugText;
 
     /** Committed transcript as a list of typed turns (TRANSLATION or
-     *  COMMAND), newest at the end. The display filter is applied at
-     *  render time so changing the display mode re-renders the entire
-     *  history without losing any information. */
+     *  COMMAND), newest at the end. Card i of turnsContainer mirrors
+     *  history[i]; an optional "active" card trails for the in-flight
+     *  sentence. Committed cards are never modified after creation — the
+     *  display-mode filter is applied per card at build time. */
     private final List<Turn> history = new ArrayList<>();
-    /** Latest in-progress turn. Null when no turn is streaming. */
-    private Turn currentTurn;
-    /** Live verbatim ASR partial (cascade "live caption"). Staged only while
-     *  no MT card is streaming; cleared by {@link #onStreaming}. Mutually
-     *  exclusive with {@link #currentTurn}. */
-    private String liveAsrPartial;
-    /**
-     * Generation counter for "scroll to bottom after the next layout". Each
-     * renderTranscript that wants to auto-scroll bumps this; the
-     * OnGlobalLayoutListener checks its captured generation against the
-     * current one and discards itself if superseded by a newer render call.
-     */
-    private int scrollGen;
 
-    // ----- P3: render throttling -----
-    // MT/ASR/spec deltas can fire many times per second; rebuilding the whole
-    // transcript + setText + layout on every delta is the classic TextView
-    // perf trap (and gets worse as history grows). Coalesce: renderTranscript()
-    // marks dirty and schedules at most one render per RENDER_THROTTLE_MS via
-    // this handler. The scheduled render always picks up the latest state, so
-    // nothing is lost — just de-duplicated to ~20 fps. call sites are
-    // unchanged; renderTranscript() is now the throttled entry, the real work
-    // moved to renderTranscriptNow().
-    private final Handler renderHandler = new Handler(Looper.getMainLooper());
-    private boolean renderScheduled;
-    private boolean renderDirty;
-    private static final int RENDER_THROTTLE_MS = 50;
+    // ----- active (in-flight) card -----
+    /** The bottom card while a sentence is streaming; null otherwise.
+     *  While non-null it is always turnsContainer's last child. */
+    private View activeCard;
+    private TextView activeSourceView;
+    private TextView activeTargetView;
+    /** Latest full source text for the active card (verbatim, no "› "). */
+    private String activeSource = "";
+    /** False while the card shows only the live ASR caption; true once MT
+     *  (final or speculative) has streamed for this sentence. */
+    private boolean activeHasMt;
+
+    // ----- target-line typewriter (see feedTypewriter) -----
+    private TextView typeView;
+    private String typeFull = "";
+    private int typeShown;
+    private boolean typeTicking;
+    private static final int TYPE_TICK_MS = 40;
+    private static final int TYPE_CATCHUP_DIVISOR = 8;
+
+    // ----- chase scroller (see maybeChase) -----
+    private boolean pinned = true;
+    private boolean chasing;
+    private int chaseSettledFrames;
+    private int lastScrollY;
+    private float maxScrollStepPx;
+    private static final int SCROLL_CHASE_DIVISOR = 4;
+    private static final float MAX_SCROLL_STEP_DP = 4.5f;
+
+    /** Vertical gap between sentence cards — just enough to tell sentences
+     *  apart without wasting space. */
+    private static final int TURN_GAP_DP = 12;
+
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
 
     private AsrEngine asr;
     private TranslationController controller;
@@ -122,8 +140,32 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         toolDispatcher = new ToolDispatcher(toolRegistry);
         debug = new DebugLogger((TextView) findViewById(R.id.debug_text));
 
-        textTranscript  = findViewById(R.id.text_transcript);
+        turnsContainer  = findViewById(R.id.turns_container);
+        statusHint      = findViewById(R.id.status_hint);
         scrollTranscript = findViewById(R.id.scroll_transcript);
+        maxScrollStepPx = MAX_SCROLL_STEP_DP * getResources().getDisplayMetrics().density;
+        // Follow-bottom bookkeeping. The chase scroller only ever scrolls
+        // DOWN, so any upward scrollY change means the user dragged away —
+        // stop following until they return to the bottom. Content shorter
+        // than the viewport can't be scrolled at all → always "at bottom".
+        scrollTranscript.getViewTreeObserver().addOnScrollChangedListener(() -> {
+            int y = scrollTranscript.getScrollY();
+            boolean contentFits = turnsContainer.getBottom() <= scrollTranscript.getHeight();
+            if (y < lastScrollY - 2 && !programmaticScroll && !contentFits) {
+                pinned = false;
+            } else if (contentFits || isAtBottom(scrollTranscript)) {
+                pinned = true;
+                maybeChase();
+            }
+            lastScrollY = y;
+        });
+        // The status hint doubles as the UNDO affordance: after an undoable
+        // command, tap it to restore the previous settings. Not clickable
+        // until an undoable command actually arrives (onCommand flips it).
+        statusHint.setOnClickListener(v -> {
+            if (lastUndoable != null) undoLastCommand();
+        });
+        statusHint.setClickable(false);
         statusLabel     = findViewById(R.id.status_label);
         statusDot       = findViewById(R.id.status_dot);
         btnMic          = findViewById(R.id.btn_mic);
@@ -205,18 +247,6 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             return true;
         });
 
-        // Tap the most recent command chip to UNDO it. TextView is
-        // clickable; the click handler consults the bottom of the
-        // transcript text and the lastUndoable field.
-        textTranscript.setClickable(true);
-        textTranscript.setOnClickListener(v -> {
-            // Only treat as UNDO if the last history entry is a COMMAND.
-            if (lastUndoable != null && !history.isEmpty()
-                    && history.get(history.size() - 1).kind == Turn.Kind.COMMAND) {
-                undoLastCommand();
-            }
-        });
-
         try {
             asr = AsrEngineFactory.create(this, config, sessionContext, toolRegistry, debug);
         } catch (Throwable t) {
@@ -241,7 +271,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         history.addAll(transcriptStore.load());
         if (!history.isEmpty()) {
             debug.log("boot", "transcript restored: " + history.size() + " turns");
-            renderTranscript();
+            rebuildAllTurns();
         }
 
         setStatus(Status.IDLE, getString(R.string.hint_speak));
@@ -277,7 +307,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         session.setTemperature(newTemp);
         session.setCascadeEnabled(newCascade);
         if (changed) {
-            renderTranscript();
+            rebuildAllTurns();
         }
     }
 
@@ -319,9 +349,9 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Drop any pending throttled render so it doesn't fire into a
+        // Drop any pending typewriter ticks so they don't fire into a
         // destroyed view.
-        renderHandler.removeCallbacksAndMessages(null);
+        uiHandler.removeCallbacksAndMessages(null);
         if (controller != null) controller.stop();
     }
 
@@ -366,8 +396,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 debug.log("pipeline", "asr is null — bailing");
                 return;
             }
-            currentTurn = null;
-            liveAsrPartial = null;
+            dropActiveCard();  // an uncommitted card never made it to history
             btnMic.setImageResource(R.drawable.ic_mic);
             btnMic.setBackground(getDrawable(R.drawable.bg_mic_recording));
             controller.start();
@@ -402,11 +431,13 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         setStatus(Status.IDLE, getString(R.string.hint_speak));
         btnMic.setImageResource(R.drawable.ic_mic);
         btnMic.setBackground(getDrawable(R.drawable.bg_mic));
-        // Mic stopped — drop any lingering live caption so it doesn't sit on
-        // screen after the user stops talking.
-        if (liveAsrPartial != null) {
-            liveAsrPartial = null;
-            renderTranscript();
+        // Mic stopped — drop a lingering caption-only card so it doesn't sit
+        // on screen after the user stops talking. A card that already has MT
+        // content stays (mirrors the old currentTurn semantics: it remains
+        // visible until the next start drops it).
+        if (activeCard != null && !activeHasMt) {
+            dropActiveCard();
+            maybeChase();
         }
     }
 
@@ -414,42 +445,75 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
      *  line while the user is speaking so first text lands at ASR TTFB
      *  (~0.4 s) instead of after sentence-final + MT TTFB. Only staged when
      *  no MT card is streaming for the current sentence; once MT streams
-     *  ({@link #onStreaming}) the translation replaces the caption. */
+     *  ({@link #onStreaming}) the translation takes over the same card. */
     @Override public void onPartialTranscript(String text) {
         if (text == null || text.isEmpty()) return;
-        if (currentTurn != null) {
+        if (activeCard != null && activeHasMt) {
             // An MT card is already streaming for an earlier sentence — don't
             // show a second caption alongside it; the next sentence's caption
-            // will stage once that card commits and currentTurn clears.
+            // will stage once that card commits.
             return;
         }
-        if (text.equals(liveAsrPartial)) return;  // no change → skip re-render
-        liveAsrPartial = text;
-        renderTranscript();
+        if (activeCard != null && text.equals(activeSource)) return;  // no change
+        activeSource = text;
+        attachActiveCard();
+        maybeChase();
     }
 
     @Override public void onStreaming(String source, String target, String srcLang, String tgtLang) {
-        // MT is streaming for this sentence — drop the verbatim caption; the
-        // bilingual card takes its place.
-        liveAsrPartial = null;
-        currentTurn = Turn.translation(source, target, srcLang, tgtLang);
-        renderTranscript();
+        // MT is streaming for this sentence — the verbatim caption (if any)
+        // becomes the bilingual card in place, at the same bottom position.
+        // The source line updates directly (that IS the transcription
+        // rhythm); the target line feeds the typewriter.
+        activeHasMt = true;
+        activeSource = source == null ? "" : source;
+        attachActiveCard();
+        feedTypewriter(target == null ? "" : target);
+        maybeChase();
     }
 
-    /** Finished turn: fold into history, then render history alone. */
+    /** Finished turn: the active card freezes in place and becomes part of
+     *  the immutable history — no other line re-layouts. If the typewriter
+     *  is still behind on the target line it keeps draining into the (now
+     *  committed) card; this reads as "finishing the sentence", never as a
+     *  paste. */
     @Override public void onCommitted(String source, String target, String srcLang, String tgtLang) {
-        boolean hasContent = (source != null && !source.trim().isEmpty())
-                || (target != null && !target.trim().isEmpty());
+        String src = source == null ? "" : source;
+        String tgt = target == null ? "" : target;
+        boolean hasContent = !src.trim().isEmpty() || !tgt.trim().isEmpty();
         if (hasContent) {
-            Turn t = Turn.translation(source, target, srcLang, tgtLang);
+            Turn t = Turn.translation(src, tgt, srcLang, tgtLang);
             history.add(t);
             // Feed into SessionContext so the next MT LLM call sees the
             // recent utterance for "再翻一次" / partial-reference style
             // commands.
             sessionContext.recordUtterance(t);
+            if (activeCard != null) {
+                // Finalize in place: the source locks to the final text; the
+                // target keeps its already-typed prefix and drains the rest.
+                activeHasMt = true;
+                activeSource = src;
+                typeFull = tgt;
+                typeShown = Math.min(typeShown, typeFull.length());
+                refreshActiveCardText();
+                ensureTypeTicking();  // no-op if already drained
+                // typeView keeps pointing at this card's target line so the
+                // ticker finishes it even though the card is now history.
+                activeCard = null;
+                activeSourceView = null;
+                activeTargetView = null;
+                activeSource = "";
+                activeHasMt = false;
+            } else {
+                // Committed without ever streaming — append a finished card.
+                turnsContainer.addView(buildTurnView(t, session.displayMode()),
+                        turnLayoutParams());
+            }
+        } else {
+            // Empty commit — drop the card entirely.
+            dropActiveCard();
         }
-        currentTurn = null;
-        renderTranscript();
+        maybeChase();
     }
 
     /** Voice control command(s) from the MT LLM. Dispatched on the
@@ -466,12 +530,29 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 debug.log("CMD", "  " + calls.get(i).name + " -> " + r.summary);
             }
         }
-        // The chip in the transcript uses the primary (last non-rejected)
-        // result if any; otherwise we surface a short "rejected" chip.
+        // Settings-style results go to the one-line status hint under the
+        // transcript (kept short: summary only, no "heard:" echo) so the
+        // transcript itself stays pure conversation. Only long-form results
+        // the user explicitly asked for (session summary, commands catalog)
+        // still get an in-transcript note card.
         if (applied.primaryIndex >= 0) {
             CommandResult primary = applied.results.get(applied.primaryIndex);
             ToolCall primaryCall = calls.get(applied.primaryIndex);
-            history.add(Turn.command(formatChip(primary, primaryCall)));
+            boolean addsNoteCard = primary.effects.contains(CommandResult.Effect.SUMMARIZE_SESSION)
+                    || primary.effects.contains(CommandResult.Effect.LIST_COMMANDS);
+            if (addsNoteCard) {
+                history.add(Turn.command(formatChip(primary, primaryCall)));
+                // Insert at the history index, NOT plain append: when an
+                // active (in-flight) card is showing it must stay the last
+                // child, and the note card belongs right before it.
+                int noteIdx = history.size() - 1;
+                turnsContainer.addView(
+                        buildTurnView(history.get(noteIdx), session.displayMode()),
+                        noteIdx, turnLayoutParams());
+            } else {
+                setStatusHint("» " + primary.summary
+                        + (primary.sessionSnapshot != null ? "  ↩" : ""));
+            }
             // Record the command in session history. Use the original
             // spoken phrase + tool name + a short args summary — enough
             // for the LLM to disambiguate "改成中文" against prior
@@ -494,7 +575,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             for (CommandResult.Effect e : primary.effects) {
                 switch (e) {
                     case RERENDER:
-                        renderTranscript();
+                        rebuildAllTurns();
                         break;
                     case ENGINE_RECONCILE:
                         reconcileEngineIfNeeded();
@@ -529,30 +610,32 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                         throw new IllegalStateException("unhandled effect: " + e);
                 }
             }
-            // Save the snapshot for UNDO before clobbering the field.
+            // Save the snapshot for UNDO before clobbering the field. The
+            // status hint (already showing the summary, with a ↩ marker)
+            // is the tap target.
             if (primary.sessionSnapshot != null) {
                 lastUndoable = primary;
-                showUndoToast(primary);
             }
+            statusHint.setClickable(lastUndoable != null);
         } else {
-            // All rejected — show a single rejection chip + no UNDO.
-            history.add(Turn.command("» rejected: " + shortRejection(applied.results)));
-            renderTranscript();
+            // All rejected — one short status line, no UNDO.
+            setStatusHint("» rejected: " + shortRejection(applied.results));
         }
+        maybeChase();
     }
 
-    /** clear_transcript handler: wipe history but keep the just-added chip so
-     *  the user sees what happened, then persist immediately. */
+    /** clear_transcript handler: wipe history and every transcript view.
+     *  The command's summary already sits in the status hint (set by
+     *  onCommand), so the user still sees what happened. Persist the wipe
+     *  immediately — if the process dies before onPause, the cleared state
+     *  should still stick. */
     private void doClearTranscript() {
-        Turn lastChip = history.remove(history.size() - 1);
         history.clear();
-        currentTurn = null;
-        liveAsrPartial = null;
-        history.add(lastChip);
-        renderTranscript();
-        // Persist the wipe immediately — if the process dies before onPause,
-        // the cleared state should still stick.
+        turnsContainer.removeAllViews();
+        dropActiveCard();   // also resets the typewriter
+        pinned = true;      // an empty transcript is always "at bottom"
         if (transcriptStore != null) transcriptStore.save(history);
+        maybeChase();
     }
 
     /** Build the chip text shown in the transcript for a successful
@@ -574,21 +657,8 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 : results.get(0).rejectReason;
     }
 
-    /** Show a Toast offering UNDO of the most recently applied tool. */
-    private void showUndoToast(CommandResult applied) {
-        final CommandResult captured = applied;
-        Toast toast = Toast.makeText(this, "» " + applied.summary, Toast.LENGTH_LONG);
-        // We attach a "UNDO" action via a slightly different approach —
-        // system Toasts can't have buttons, so we use a Snackbar if the
-        // layout has a CoordinatorLayout; here we fall back to a long
-        // Toast plus a debug-log hint. UNDO is invoked by tapping the
-        // most recent chip in the transcript (chips are tappable — see
-        // setupTranscriptClickHandler). This Toast is just visibility.
-        toast.show();
-    }
-
-    /** Invoked when the user taps the most recent command chip in the
-     *  transcript. Restores the snapshot and applies the side effects
+    /** Invoked when the user taps the status hint while an undoable command
+     *  is showing. Restores the snapshot and applies the side effects
      *  implied by the inverse of the tool. */
     private void undoLastCommand() {
         if (lastUndoable == null) return;
@@ -605,9 +675,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             applyDebugVisibility(r.prevDebug);
         }
         lastUndoable = null;
-        renderTranscript();
+        statusHint.setClickable(false);
+        setStatusHint("» Undone");
+        rebuildAllTurns();
         reconcileEngineIfNeeded();
-        Toast.makeText(this, "Undone", Toast.LENGTH_SHORT).show();
     }
 
     /** export_transcript handler: serialize current history to plain text
@@ -633,11 +704,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         ClipData clip = ClipData.newPlainText("Vokii transcript", text);
         ((ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE))
                 .setPrimaryClip(clip);
-        // Update the just-added chip to show the character count.
-        Turn last = history.get(history.size() - 1);
-        history.set(history.size() - 1,
-                Turn.command(last.commandText + "  (" + text.length() + " chars)"));
-        renderTranscript();
+        setStatusHint("» Copied " + text.length() + " chars");
     }
 
     private static String appendLabel(String lang, String text) {
@@ -657,10 +724,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             idx--;
         }
         if (idx < 0) {
-            // Update the just-added chip to reflect the failure.
-            Turn last = history.get(history.size() - 1);
-            history.set(history.size() - 1, Turn.command(last.commandText + "  (no turn to re-translate)"));
-            renderTranscript();
+            setStatusHint("» No turn to re-translate");
             return;
         }
         final Turn original = history.get(idx);
@@ -698,17 +762,13 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                                 session.sourceLang(), session.targetLang());
                         history.set(turnIdx, newTurn);
                         sessionContext.recordUtterance(newTurn);
-                        renderTranscript();
+                        updateTurnViewAt(turnIdx);
+                        setStatusHint("» Re-translated");
                         debug.log("MT", "retranslated turn " + turnIdx);
                     });
                 }
                 @Override public void onError(String message) {
-                    runOnUiThread(() -> {
-                        Turn last = history.get(history.size() - 1);
-                        history.set(history.size() - 1,
-                                Turn.command(last.commandText + "  (failed: " + message + ")"));
-                        renderTranscript();
-                    });
+                    runOnUiThread(() -> setStatusHint("» Re-translate failed: " + message));
                 }
                 @Override public void onToolCalls(java.util.List<ToolCall> calls) { }
             });
@@ -742,8 +802,9 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         }
         sb.append("\nSay any of the above in Chinese or English. " +
                 "Example: \"下面改成中日翻译\" or \"open debug\".");
+        if (chipIndex < 0 || chipIndex >= history.size()) return;  // cleared mid-flight
         history.set(chipIndex, Turn.command(sb.toString()));
-        renderTranscript();
+        updateTurnViewAt(chipIndex);
     }
 
     /** summarize_session handler: build a single string from all turns,
@@ -757,10 +818,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             if (!t.target.isEmpty()) transcript.append(t.target).append('\n');
         }
         if (transcript.length() == 0) {
-            Turn last = history.get(history.size() - 1);
-            history.set(history.size() - 1,
-                    Turn.command(last.commandText + "  (transcript is empty)"));
-            renderTranscript();
+            updateLastNoteCard("  (transcript is empty)");
             return;
         }
         String summaryPrompt =
@@ -782,129 +840,323 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 @Override public void onResult(String text) {
                     runOnUiThread(() -> {
                         TurnParser p = TurnParser.parse(text, "zh", "en");
-                        // Replace the in-progress chip with the summary chip.
+                        // Replace the in-progress note card with the summary.
                         String summary = p.source.isEmpty() ? p.target : p.source;
                         if (summary.isEmpty()) summary = text;
-                        history.set(history.size() - 1,
-                                Turn.command("» Summary: " + summary));
-                        renderTranscript();
+                        int i = lastCommandIndex();
+                        if (i < 0) return;  // transcript cleared mid-flight
+                        history.set(i, Turn.command("» Summary: " + summary));
+                        updateTurnViewAt(i);
                     });
                 }
                 @Override public void onError(String message) {
-                    runOnUiThread(() -> {
-                        Turn last = history.get(history.size() - 1);
-                        history.set(history.size() - 1,
-                                Turn.command(last.commandText + "  (failed: " + message + ")"));
-                        renderTranscript();
-                    });
+                    runOnUiThread(() -> updateLastNoteCard("  (failed: " + message + ")"));
                 }
                 @Override public void onToolCalls(java.util.List<ToolCall> calls) { }
             });
         });
     }
 
-    /**
-     * Re-render the transcript view as {@code history + currentTurn} and, if
-     * the user was already at the bottom, keep it pinned there. If the user
-     * has scrolled up to read history, leave their scroll position alone.
-     *
-     * The auto-scroll runs from an {@link ViewTreeObserver.OnGlobalLayoutListener}
-     * — NOT from a {@code scroll.post()} — because setText only schedules a
-     * layout pass, and a posted runnable typically runs BEFORE the layout.
-     * fullScroll on the old layout scrolls to the OLD bottom; the new
-     * content (added at the end) is then laid out below that scroll position
-     * and stays clipped. Waiting for the layout to complete is what actually
-     * pins the new line to the visible bottom.
-     */
-    /**
-     * Re-render the transcript view as {@code history + currentTurn} and, if
-     * the user was already at the bottom, keep it pinned there. If the user
-     * has scrolled up to read history, leave their scroll position alone.
-     *
-     * <p>Throttled (P3): this is the entry point all callers use. It marks
-     * the render dirty and schedules at most one {@link #renderTranscriptNow}
-     * per {@link #RENDER_THROTTLE_MS}; the scheduled run always renders the
-     * latest state, so high-frequency streaming deltas (MT/ASR/spec) de-dup
-     * to ~20 fps instead of triggering a full setText+layout each. The final
-     * state always renders within one throttle window.
-     *
-     * <p>The auto-scroll runs from an {@link ViewTreeObserver.OnGlobalLayoutListener}
-     * — NOT from a {@code scroll.post()} — because setText only schedules a
-     * layout pass, and a posted runnable typically runs BEFORE the layout.
-     * fullScroll on the old layout scrolls to the OLD bottom; the new
-     * content (added at the end) is then laid out below that scroll position
-     * and stays clipped. Waiting for the layout to complete is what actually
-     * pins the new line to the visible bottom.
-     */
-    private void renderTranscript() {
-        renderDirty = true;
-        if (!renderScheduled) {
-            renderScheduled = true;
-            renderHandler.postDelayed(this::renderTranscriptNow, RENDER_THROTTLE_MS);
-        }
+    // ----- transcript rendering (per-turn cards) -----
+    //
+    // Each committed turn owns a card (a vertical LinearLayout holding a
+    // source line and a target line). Cards are NEVER modified once
+    // committed — only the bottom "active" card (the sentence currently
+    // being transcribed/translated) updates. This is what keeps on-screen
+    // lines stable: text growth and wrapping only ever happen inside the
+    // active card, and the chase scroller glides the window down smoothly
+    // instead of jumping.
+    //
+    // Invariant: turnsContainer children == history views, in order, plus
+    // an optional trailing active card. Every mutation goes through
+    // buildTurnView / attachActiveCard / updateTurnViewAt / rebuildAllTurns
+    // so the invariant can't drift.
+
+    private LinearLayout.LayoutParams turnLayoutParams() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = (int) (TURN_GAP_DP * getResources().getDisplayMetrics().density + 0.5f);
+        return lp;
     }
 
-    /** The actual render — builds the text, setText, and pins to bottom if
-     *  appropriate. Always invoked on the main thread via the throttle
-     *  handler. */
-    private void renderTranscriptNow() {
-        renderScheduled = false;
-        if (!renderDirty) return;
-        renderDirty = false;
-        StringBuilder sb = new StringBuilder();
+    private TextView makeTranscriptLine() {
+        TextView tv = new TextView(this);
+        tv.setTextSize(16);
+        tv.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+        tv.setLineSpacing(0f, 1.3f);
+        return tv;
+    }
+
+    /** Build the view for one committed turn. TRANSLATION → source line over
+     *  target line (each hidden when empty or filtered out by the display
+     *  mode); COMMAND → a single dimmer note line (legacy chips, session
+     *  summary, commands catalog). */
+    private View buildTurnView(Turn t, SessionConfig.DisplayMode mode) {
+        if (t.kind == Turn.Kind.COMMAND) {
+            TextView note = new TextView(this);
+            note.setText(t.commandText);
+            note.setTextSize(14);
+            note.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
+            note.setLineSpacing(0f, 1.2f);
+            return note;
+        }
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        TextView src = makeTranscriptLine();
+        TextView tgt = makeTranscriptLine();
+        src.setText(t.source);
+        tgt.setText(t.target);
+        src.setVisibility(mode != SessionConfig.DisplayMode.TARGET_ONLY && !t.source.isEmpty()
+                ? View.VISIBLE : View.GONE);
+        tgt.setVisibility(mode != SessionConfig.DisplayMode.SOURCE_ONLY && !t.target.isEmpty()
+                ? View.VISIBLE : View.GONE);
+        card.addView(src);
+        card.addView(tgt);
+        return card;
+    }
+
+    /** Rebuild every card from {@link #history} — used for user-initiated
+     *  wholesale changes (display-mode flip, undo, boot restore). Streaming
+     *  never goes through here. The in-flight card is recreated from its
+     *  saved state so an ongoing sentence survives the rebuild. */
+    private void rebuildAllTurns() {
+        boolean hadActive = activeCard != null;
+        activeCard = null;
+        activeSourceView = null;
+        activeTargetView = null;
+        typeView = null;
+        if (!hadActive) {
+            typeFull = "";
+            typeShown = 0;
+        }
+        turnsContainer.removeAllViews();
         SessionConfig.DisplayMode mode = session.displayMode();
         for (int i = 0; i < history.size(); i++) {
-            appendTurn(sb, history.get(i), mode);
-            if (i < history.size() - 1) sb.append('\n');  // blank line between turns
+            turnsContainer.addView(buildTurnView(history.get(i), mode), turnLayoutParams());
         }
-        if (currentTurn != null) {
-            if (sb.length() > 0) sb.append('\n');
-            appendTurn(sb, currentTurn, mode);
-        } else if (liveAsrPartial != null && !liveAsrPartial.isEmpty()) {
-            // No MT card streaming yet — show the live verbatim caption so
-            // the user sees text while speaking (ASR TTFB ≈ 0.4 s vs waiting
-            // for sentence-final + MT TTFB). Replaced by the bilingual card
-            // once MT streams (onStreaming clears liveAsrPartial).
-            if (sb.length() > 0) sb.append('\n');
-            sb.append("› ").append(liveAsrPartial);
+        if (hadActive) {
+            attachActiveCard(false);  // keep typewriter state — typing resumes
+            ensureTypeTicking();
         }
-        String text = sb.toString().replaceAll("\\s+$", "");
-        boolean wasAtBottom = isAtBottom(scrollTranscript);
-        textTranscript.setText(text);
-        if (wasAtBottom) {
-            final int myGen = ++scrollGen;
-            final ViewTreeObserver vto = scrollTranscript.getViewTreeObserver();
-            vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-                @Override public void onGlobalLayout() {
-                    if (myGen != scrollGen) return;  // a newer render superseded us
-                    vto.removeOnGlobalLayoutListener(this);
-                    scrollTranscript.fullScroll(View.FOCUS_DOWN);
-                }
-            });
-        }
+        maybeChase();
     }
 
-    /** Append one turn's text to the renderer buffer, respecting the
-     *  current display mode. COMMAND turns always render as a chip —
-     *  the display mode doesn't filter them. */
-    private static void appendTurn(StringBuilder sb, Turn turn, SessionConfig.DisplayMode mode) {
-        if (turn.kind == Turn.Kind.COMMAND) {
-            sb.append("» ").append(turn.commandText);
-            return;
+    /** Replace the view of history[idx] in place (retranslate / summary /
+     *  catalog results). The index stays valid because appends never shift
+     *  earlier children. */
+    private void updateTurnViewAt(int idx) {
+        if (idx < 0 || idx >= history.size()) return;
+        turnsContainer.removeViewAt(idx);
+        turnsContainer.addView(buildTurnView(history.get(idx), session.displayMode()),
+                idx, turnLayoutParams());
+        maybeChase();
+    }
+
+    /** Remove the in-flight card (if any) without committing it, and reset
+     *  the typewriter. Used when listening stops/starts and on clear —
+     *  mirrors the old currentTurn=null / liveAsrPartial=null reset. */
+    private void dropActiveCard() {
+        if (activeCard != null) {
+            turnsContainer.removeView(activeCard);
+            activeCard = null;
+            activeSourceView = null;
+            activeTargetView = null;
+        } else {
+            // No in-flight card means typeView (if set) belongs to a
+            // COMMITTED card still draining — complete it first so it
+            // isn't left frozen with a half-typed target line.
+            flushTypewriter();
         }
-        switch (mode) {
-            case BOTH:
-                if (!turn.source.isEmpty()) sb.append(turn.source);
-                if (!turn.source.isEmpty() && !turn.target.isEmpty()) sb.append('\n');
-                if (!turn.target.isEmpty()) sb.append(turn.target);
-                break;
-            case SOURCE_ONLY:
-                if (!turn.source.isEmpty()) sb.append(turn.source);
-                break;
-            case TARGET_ONLY:
-                if (!turn.target.isEmpty()) sb.append(turn.target);
-                break;
+        activeSource = "";
+        activeHasMt = false;
+        typeView = null;
+        typeFull = "";
+        typeShown = 0;
+    }
+
+    /** Ensure the in-flight card exists as the last child, then refresh its
+     *  text. Creating it also hands the typewriter a fresh target line. */
+    private void attachActiveCard() {
+        attachActiveCard(true);
+    }
+
+    private void attachActiveCard(boolean resetTypewriter) {
+        if (activeCard == null) {
+            flushTypewriter();  // finish the previous card's drain, if any
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            activeSourceView = makeTranscriptLine();
+            activeTargetView = makeTranscriptLine();
+            card.addView(activeSourceView);
+            card.addView(activeTargetView);
+            turnsContainer.addView(card, turnLayoutParams());
+            activeCard = card;
+            typeView = activeTargetView;
+            if (resetTypewriter) {
+                typeFull = "";
+                typeShown = 0;
+            }
         }
+        refreshActiveCardText();
+    }
+
+    /** Push the saved active-card state into its views. The caption phase
+     *  (pre-MT) shows "› verbatim" and bypasses the display-mode filter —
+     *  it's the only live signal the user has while speaking. */
+    private void refreshActiveCardText() {
+        if (activeCard == null) return;
+        if (!activeHasMt) {
+            activeSourceView.setVisibility(View.VISIBLE);
+            activeSourceView.setText("› " + activeSource);
+        } else if (session.displayMode() != SessionConfig.DisplayMode.TARGET_ONLY
+                && !activeSource.isEmpty()) {
+            activeSourceView.setVisibility(View.VISIBLE);
+            activeSourceView.setText(activeSource);
+        } else {
+            activeSourceView.setVisibility(View.GONE);
+        }
+        applyTypedText();
+    }
+
+    // ----- target-line typewriter -----
+    //
+    // The MT engine delivers the full accumulated target on every delta;
+    // dumping it straight into the view reads as a paragraph paste. Instead
+    // we reveal it character-by-character: every TYPE_TICK_MS the ticker
+    // advances by max(1, backlog / 8) chars — a calm ~25 chars/s baseline
+    // that automatically speeds up to drain bursts, so it always looks like
+    // typing yet never lags far behind the stream. Revisions (speculative
+    // MT rewriting a draft) snap back to the common prefix instantly, then
+    // resume typing forward.
+
+    private void feedTypewriter(String latestFull) {
+        String shown = typeFull.substring(0, typeShown);
+        if (!latestFull.startsWith(shown)) {
+            typeShown = commonPrefix(latestFull, shown);
+        }
+        typeFull = latestFull;
+        ensureTypeTicking();
+    }
+
+    private static int commonPrefix(String a, String b) {
+        int n = Math.min(a.length(), b.length());
+        int i = 0;
+        while (i < n && a.charAt(i) == b.charAt(i)) i++;
+        return i;
+    }
+
+    private void ensureTypeTicking() {
+        if (typeTicking || typeView == null || typeShown >= typeFull.length()) return;
+        typeTicking = true;
+        uiHandler.postDelayed(typeTicker, TYPE_TICK_MS);
+    }
+
+    private final Runnable typeTicker = new Runnable() {
+        @Override public void run() {
+            typeTicking = false;
+            if (typeView == null) return;
+            int backlog = typeFull.length() - typeShown;
+            if (backlog <= 0) return;
+            typeShown = Math.min(typeFull.length(),
+                    typeShown + Math.max(1, backlog / TYPE_CATCHUP_DIVISOR));
+            applyTypedText();
+            maybeChase();
+            ensureTypeTicking();
+        }
+    };
+
+    /** Reveal the remaining text instantly — used for the previous card when
+     *  a new sentence starts mid-drain. */
+    private void flushTypewriter() {
+        if (typeView == null) return;
+        typeShown = typeFull.length();
+        applyTypedText();
+    }
+
+    private void applyTypedText() {
+        if (typeView == null) return;
+        typeShown = Math.min(typeShown, typeFull.length());
+        String typed = typeFull.substring(0, typeShown);
+        boolean show = session.displayMode() != SessionConfig.DisplayMode.SOURCE_ONLY
+                && !typed.isEmpty();
+        typeView.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) typeView.setText(typed);
+    }
+
+    // ----- chase scroller -----
+    //
+    // fullScroll() used to jump instantly — that's what made the window
+    // feel like it was leaping. The chaser instead runs every frame while
+    // pinned and moves a fraction of the remaining distance (capped at
+    // MAX_SCROLL_STEP_DP per frame ≈ 270 dp/s): one new line eases in over
+    // ~150 ms, bigger appends glide at a calm uniform speed. Content
+    // shrinking (clear, dropped caption) snaps immediately — animating
+    // upward motion onto removed text looks broken.
+
+    /** Set by the chaser around its programmatic snap-up so the scroll
+     *  listener doesn't mistake it for a user drag-up and un-pin. */
+    private boolean programmaticScroll;
+
+    private void maybeChase() {
+        if (!pinned || chasing) return;
+        chasing = true;
+        chaseSettledFrames = 0;
+        scrollTranscript.postOnAnimation(scrollChaser);
+    }
+
+    private final Runnable scrollChaser = new Runnable() {
+        @Override public void run() {
+            if (!pinned) {
+                chasing = false;
+                return;
+            }
+            int target = Math.max(0, turnsContainer.getBottom() - scrollTranscript.getHeight());
+            int cur = scrollTranscript.getScrollY();
+            int remaining = target - cur;
+            if (remaining > 2) {
+                int step = Math.min(Math.max(remaining / SCROLL_CHASE_DIVISOR, 2),
+                        (int) maxScrollStepPx);
+                scrollTranscript.scrollTo(0, cur + step);
+                chaseSettledFrames = 0;
+                scrollTranscript.postOnAnimation(this);
+            } else if (remaining < -2) {
+                programmaticScroll = true;
+                scrollTranscript.scrollTo(0, target);
+                programmaticScroll = false;
+                chaseSettledFrames = 0;
+                scrollTranscript.postOnAnimation(this);
+            } else if (++chaseSettledFrames < 2) {
+                // Confirm the target is stable across a layout pass before
+                // sleeping — the first frame after a content change can read
+                // a stale, pre-layout container bottom.
+                scrollTranscript.postOnAnimation(this);
+            } else {
+                chasing = false;
+            }
+        }
+    };
+
+    private void setStatusHint(CharSequence text) {
+        statusHint.setText(text);
+    }
+
+    /** Append a suffix to the most recent note (COMMAND) card's text — used
+     *  by summarize to fold the result/failure back into its own card.
+     *  Finds the LAST command turn rather than assuming it is still the
+     *  last history entry (new turns may have committed meanwhile). */
+    private void updateLastNoteCard(String suffix) {
+        int i = lastCommandIndex();
+        if (i < 0) return;
+        history.set(i, Turn.command(history.get(i).commandText + suffix));
+        updateTurnViewAt(i);
+    }
+
+    private int lastCommandIndex() {
+        for (int i = history.size() - 1; i >= 0; i--) {
+            if (history.get(i).kind == Turn.Kind.COMMAND) return i;
+        }
+        return -1;
     }
 
     private boolean isAtBottom(ScrollView scroll) {

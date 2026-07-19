@@ -4,6 +4,28 @@ All notable changes to Vokii are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres loosely to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed — transcript UX (no more jumping text)
+- **Per-turn cards** replace the single all-in-one TextView: committed
+  sentences are immutable views, so lines already on screen never move
+  while new text streams in. Only the bottom "active" card (the sentence
+  in flight) updates, in place.
+- **Typewriter translation**: the target line reveals char-by-char
+  (~25 chars/s baseline with adaptive burst catch-up) instead of landing
+  as a paragraph. Speculative-MT revisions snap back to the changed
+  prefix and resume typing.
+- **Glide scrolling**: a frame-paced chase scroller (≈270 dp/s cap) eases
+  the window to the bottom instead of `fullScroll` jumping. Scrolling up
+  disengages follow mode; returning to the bottom re-engages it.
+- **Command results moved out of the transcript**: short confirmations
+  ("» Languages → zh↔ja") show on a dedicated one-line status hint under
+  the transcript instead of in-text chips. Tap the status line to UNDO
+  (replaces tap-chip-to-undo). Long-form results the user asks for
+  (session summary, commands catalog) still appear as in-transcript note
+  cards.
+- **Sentence spacing**: a 12 dp gap now separates sentence pairs.
+
 ## [v2.3.0] — 2026-07-17
 
 Voice-control subsystem + a top-to-bottom hardening pass. Speak natural

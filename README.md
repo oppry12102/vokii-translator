@@ -108,7 +108,8 @@ translation. Examples (Chinese or English both work):
 | 你能做什么？ / help | `list_commands` |
 
 State-changing commands carry a snapshot so the most recent one is
-undoable — tap its chip in the transcript. `SessionContext` feeds the
+undoable — tap the status line under the transcript (the same line that
+shows the short "» …" confirmation). `SessionContext` feeds the
 current state + recent commands + recent utterances back into the
 prompt so follow-ups like "改成中文" (change to *what*?) can be
 disambiguated. Destructive commands (`clear_transcript`) are not
