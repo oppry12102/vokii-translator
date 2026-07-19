@@ -64,6 +64,29 @@ every metric that matters to the user. See
 `tools/eval/REPORT.latency.tier1.cascade2.md` and
 `tools/eval/REPORT.cascade.step3.md` for the full breakdown.
 
+## Reading experience
+
+The transcript is built for reading while listening, not just logging:
+
+- **Live caption**: the verbatim ASR partial lands at ~0.45 s (fun-asr
+  TTFB) as a `› …` line while you're still speaking; the bilingual card
+  takes over the same slot once MT streams.
+- **Stable lines**: each committed sentence is an immutable card — lines
+  already on screen never move or re-wrap. Only the bottom in-flight
+  card updates, in place.
+- **Typewriter translation**: the target line reveals char-by-char
+  (~25 chars/s with adaptive burst catch-up) instead of landing as a
+  paragraph. Speculative-MT drafts refine in place — a revision snaps
+  back to the changed prefix and resumes typing.
+- **Glide scrolling**: a frame-paced chase scroller eases the window to
+  the bottom (~270 dp/s cap) instead of jumping. Scroll up to read back
+  and follow mode disengages until you return to the bottom.
+- **Status line**: voice-command confirmations ("» Languages → zh↔ja")
+  show on a one-line hint under the transcript — tap it to undo. The
+  transcript itself stays pure conversation (session summaries and the
+  commands catalog still appear in-line as note cards).
+- 12 dp of breathing room between sentence pairs.
+
 ## Settings
 
 Two real knobs (everything else baked into BuildConfig at compile time):
@@ -194,7 +217,7 @@ See `tools/eval/README.md` for the full driver list and
 │   ├── build.gradle             #   BuildConfig fields from local.properties
 │   ├── keystore/vokii-release.jks
 │   └── src/main/java/com/vokii/translator/
-│       ├── MainActivity.java    #   mic button, transcript card, status dot
+│       ├── MainActivity.java    #   mic button, per-turn transcript cards, status hint + dot
 │       ├── SettingsActivity.java
 │       ├── TranslationController.java
 │       ├── AsrEngineFactory.java
@@ -251,9 +274,11 @@ See `tools/eval/README.md` for the full driver list and
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md). Latest: **v2.3.0** — voice-control
+See [CHANGELOG.md](CHANGELOG.md). Latest tagged: **v2.3.0** — voice-control
 subsystem + hardening pass (concurrency/leak fixes, fun-asr −52 % MER
-reclaimed).
+reclaimed). The `v2-cascade` branch on top adds, unreleased: live ASR
+caption + speculative MT + qwen-turbo (latency P0/P1/P5) and the
+transcript reading-experience rework above.
 
 ## License
 
