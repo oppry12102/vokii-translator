@@ -2,9 +2,9 @@
     <string name="app_name">Vokii</string>
     <string name="title_settings">Settings</string>
     <string name="settings_intro">All other preferences are voice-controlled. Say "help" or "你能做什么" to see the available commands.</string>
-    <string name="hint_speak">Tap the mic to start</string>
-    <string name="hint_listening">Listening…</string>
-    <string name="hint_paused">Paused (mic muted)</string>
+    <string name="hint_speak">点击麦克风开始</string>
+    <string name="hint_listening">聆听中…</string>
+    <string name="hint_paused">已暂停</string>
     <string name="action_reset">Reset all to defaults</string>
     <string name="section_api">API</string>
     <string name="section_translation">Translation</string>
@@ -16,8 +16,8 @@
     <string name="setting_display_mode_hint">Both shows two columns, source/target only shows one.</string>
     <string name="setting_cascade_hint">ON = fun-asr ASR + qwen-turbo MT (best accuracy, supports voice commands). OFF = joint Qwen-Omni Realtime (no voice commands).</string>
     <string name="setting_debug_hint">Show the rolling log panel with ASR/MT/CMD events at the bottom of the main screen.</string>
-    <string name="hint_thinking">Translating…</string>
-    <string name="hint_preparing">Preparing ASR…</string>
+    <string name="hint_thinking">翻译中…</string>
+    <string name="hint_preparing">准备识别…</string>
     <string name="label_debug">Debug log</string>
     <string name="action_settings">Settings</string>
     <string name="action_clear">Clear</string>

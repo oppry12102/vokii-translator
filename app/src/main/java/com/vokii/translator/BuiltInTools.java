@@ -49,11 +49,11 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            if (args == null) return CommandResult.rejected("missing args");
+            if (args == null) return CommandResult.rejected("缺少参数");
             String src = Json.optString(args, "source", "").trim().toLowerCase(Locale.ROOT);
             String tgt = Json.optString(args, "target", "").trim().toLowerCase(Locale.ROOT);
             if (src.isEmpty() || tgt.isEmpty()) {
-                return CommandResult.rejected("need both source and target");
+                return CommandResult.rejected("需要同时指定源语言和目标语言");
             }
             if (src.equals(tgt)) {
                 // src == tgt means the LLM was asked to "translate to X" and
@@ -66,23 +66,23 @@ public final class BuiltInTools {
                 String curSrc = session.sourceLang();
                 String curTgt = session.targetLang();
                 if (src.equals(curTgt)) {
-                    return CommandResult.ok("Already translating to " + displayName(src)).build();
+                    return CommandResult.ok("已经在翻译成 " + displayName(src)).build();
                 }
                 if (!src.equals(curSrc)) {
                     return CommandResult.rejected(
-                            "ambiguous: '" + displayName(src)
-                                    + "' is neither the current source ("
-                                    + displayName(curSrc) + ") nor target ("
-                                    + displayName(curTgt) + "); specify both source and target");
+                            "有歧义：'" + displayName(src)
+                                    + "' 既不是当前源语言（"
+                                    + displayName(curSrc) + "）也不是目标语言（"
+                                    + displayName(curTgt) + "），请同时指定两者");
                 }
                 SessionConfig.Snapshot snap = session.snapshot();
                 session.setLanguages(curTgt, src);
                 config.setSourceLang(curTgt);
                 config.setTargetLang(src);
                 return CommandResult.ok(
-                        "Languages → " + displayName(curTgt) + " ↔ " + displayName(src)
-                                + "  (flipped; was " + displayName(curSrc)
-                                + " ↔ " + displayName(curTgt) + ")")
+                        "翻译语言 → " + displayName(curTgt) + " ↔ " + displayName(src)
+                                + "（已翻转，原 " + displayName(curSrc)
+                                + " ↔ " + displayName(curTgt) + "）")
                         .effect(CommandResult.Effect.RERENDER)
                         .snapshot(snap)
                         .build();
@@ -95,8 +95,8 @@ public final class BuiltInTools {
             config.setSourceLang(src);
             config.setTargetLang(tgt);
             return CommandResult.ok(
-                    "Languages → " + displayName(src) + " ↔ " + displayName(tgt)
-                            + "  (was " + displayName(prevSrc) + " ↔ " + displayName(prevTgt) + ")")
+                    "翻译语言 → " + displayName(src) + " ↔ " + displayName(tgt)
+                            + "（原 " + displayName(prevSrc) + " ↔ " + displayName(prevTgt) + "）")
                     .effect(CommandResult.Effect.RERENDER)
                     .snapshot(snap)
                     .build();
@@ -125,19 +125,19 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            if (args == null) return CommandResult.rejected("missing args");
+            if (args == null) return CommandResult.rejected("缺少参数");
             String mode = Json.optString(args, "mode", "").trim();
             SessionConfig.DisplayMode m;
             if ("source_only".equals(mode)) m = SessionConfig.DisplayMode.SOURCE_ONLY;
             else if ("target_only".equals(mode)) m = SessionConfig.DisplayMode.TARGET_ONLY;
             else if ("both".equals(mode)) m = SessionConfig.DisplayMode.BOTH;
-            else return CommandResult.rejected("unknown mode: " + mode);
+            else return CommandResult.rejected("未知显示模式：" + mode);
             SessionConfig.Snapshot snap = session.snapshot();
             SessionConfig.DisplayMode prev = session.displayMode();
             session.setDisplayMode(m);
             config.setDisplayMode(m.key());
-            return CommandResult.ok("Display → " + displayModeName(m)
-                            + "  (was " + displayModeName(prev) + ")")
+            return CommandResult.ok("显示 → " + displayModeName(m)
+                            + "（原 " + displayModeName(prev) + "）")
                     .effect(CommandResult.Effect.RERENDER)
                     .snapshot(snap)
                     .build();
@@ -169,18 +169,18 @@ public final class BuiltInTools {
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
             if (args == null || !args.has("enabled")) {
-                return CommandResult.rejected("missing 'enabled'");
+                return CommandResult.rejected("缺少 enabled 参数");
             }
             boolean enabled = args.optBoolean("enabled", true);
             boolean prev = config.isCascadeMode();
             if (prev == enabled) {
                 // Idempotent — no need for an UNDO entry.
-                return CommandResult.ok("Cascade already " + (enabled ? "on" : "off")).build();
+                return CommandResult.ok("级联模式已" + (enabled ? "开启" : "关闭")).build();
             }
             SessionConfig.Snapshot snap = session.snapshot();
             config.setCascadeMode(enabled);
-            return CommandResult.ok("Cascade → " + (enabled ? "on" : "off")
-                            + "  (takes effect on next mic tap)")
+            return CommandResult.ok("级联模式 → " + (enabled ? "开" : "关")
+                            + "（下次开始生效）")
                     .effect(CommandResult.Effect.ENGINE_RECONCILE)
                     .snapshot(snap)
                     .prevCascade(prev)
@@ -210,16 +210,16 @@ public final class BuiltInTools {
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
             if (args == null || !args.has("enabled")) {
-                return CommandResult.rejected("missing 'enabled'");
+                return CommandResult.rejected("缺少 enabled 参数");
             }
             boolean enabled = args.optBoolean("enabled", true);
             boolean prev = config.isDebugVisible();
             if (prev == enabled) {
-                return CommandResult.ok("Debug already " + (enabled ? "on" : "off")).build();
+                return CommandResult.ok("调试已" + (enabled ? "开启" : "关闭")).build();
             }
             SessionConfig.Snapshot snap = session.snapshot();
             config.setDebugVisible(enabled);
-            return CommandResult.ok("Debug → " + (enabled ? "on" : "off"))
+            return CommandResult.ok("调试 → " + (enabled ? "开" : "关"))
                     .effect(CommandResult.Effect.DEBUG_TOGGLE)
                     .snapshot(snap)
                     .prevDebug(prev)
@@ -260,11 +260,11 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            if (args == null) return CommandResult.rejected("missing args");
+            if (args == null) return CommandResult.rejected("缺少参数");
             boolean hasStyle = args.has("style");
             boolean hasTemp = args.has("temperature");
             if (!hasStyle && !hasTemp) {
-                return CommandResult.rejected("need at least one of: style, temperature");
+                return CommandResult.rejected("至少指定风格或温度之一");
             }
             // Validate temperature BEFORE mutating any state. Previously the
             // style was applied first and then a non-numeric temperature
@@ -273,20 +273,20 @@ public final class BuiltInTools {
             Float newTemp = null;
             if (hasTemp) {
                 double raw = args.optDouble("temperature", Double.NaN);
-                if (Double.isNaN(raw)) return CommandResult.rejected("temperature not a number");
+                if (Double.isNaN(raw)) return CommandResult.rejected("温度不是数字");
                 newTemp = (float) raw;
             }
             SessionConfig.Snapshot snap = session.snapshot();
-            StringBuilder summary = new StringBuilder("Mode →");
+            StringBuilder summary = new StringBuilder("");
             if (hasStyle) {
                 String style = Json.optString(args, "style", "").trim();
                 String prev = session.stylePrompt();
                 session.setStylePrompt(style.isEmpty() ? null : style);
                 if (style.isEmpty()) {
-                    summary.append(" style cleared").append(prev == null ? "" : " (was: \"" + prev + "\")");
+                    summary.append("风格已清除").append(prev == null ? "" : "（原：\"" + prev + "\"）");
                 } else {
-                    summary.append(" style=\"").append(style).append("\"")
-                           .append(prev == null ? "" : " (was: \"" + prev + "\")");
+                    summary.append("风格=\"").append(style).append("\"")
+                           .append(prev == null ? "" : "（原：\"" + prev + "\"）");
                 }
             }
             if (newTemp != null) {
@@ -295,8 +295,8 @@ public final class BuiltInTools {
                 float now = session.temperature();
                 config.setTemperature(now);
                 if (hasStyle) summary.append("  •");
-                summary.append(" temp=").append(String.format(Locale.ROOT, "%.2f", now))
-                       .append(" (was ").append(String.format(Locale.ROOT, "%.2f", prev)).append(")");
+                summary.append("温度=").append(String.format(Locale.ROOT, "%.2f", now))
+                       .append("（原 ").append(String.format(Locale.ROOT, "%.2f", prev)).append("）");
             }
             return CommandResult.ok(summary.toString()).snapshot(snap).build();
         }
@@ -327,13 +327,13 @@ public final class BuiltInTools {
             // Read-only — no snapshot, so MainActivity doesn't offer an UNDO
             // toast for a no-op.
             String style = session.stylePrompt();
-            String summary = "Languages: " + displayName(session.sourceLang())
+            String summary = "语言：" + displayName(session.sourceLang())
                     + " ↔ " + displayName(session.targetLang())
-                    + "  •  Display: " + displayModeName(session.displayMode())
-                    + "  •  Style: " + (style == null ? "(none)" : "\"" + style + "\"")
-                    + "  •  Temp: " + String.format(Locale.ROOT, "%.2f", session.temperature())
-                    + "  •  Cascade: " + (config.isCascadeMode() ? "on" : "off")
-                    + "  •  Debug: " + (config.isDebugVisible() ? "on" : "off");
+                    + "  •  显示：" + displayModeName(session.displayMode())
+                    + "  •  风格：" + (style == null ? "（无）" : "\"" + style + "\"")
+                    + "  •  温度：" + String.format(Locale.ROOT, "%.2f", session.temperature())
+                    + "  •  级联：" + (config.isCascadeMode() ? "开" : "关")
+                    + "  •  调试：" + (config.isDebugVisible() ? "开" : "关");
             return CommandResult.ok(summary).build();
         }
     }
@@ -364,7 +364,7 @@ public final class BuiltInTools {
             // so we deliberately carry NO snapshot. That suppresses the
             // UNDO toast (which would otherwise offer a no-op undo) and
             // signals "this one is not undoable".
-            return CommandResult.ok("Transcript cleared")
+            return CommandResult.ok("已清空记录")
                     .effect(CommandResult.Effect.CLEAR_TRANSCRIPT)
                     .build();
         }
@@ -397,19 +397,19 @@ public final class BuiltInTools {
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
             if (args == null || !args.has("paused")) {
-                return CommandResult.rejected("missing 'paused'");
+                return CommandResult.rejected("缺少 paused 参数");
             }
             boolean paused = args.optBoolean("paused", false);
             boolean prev = session.micPaused();
             if (prev == paused) {
                 // Idempotent — no need for an UNDO entry.
-                return CommandResult.ok("Mic already " + (paused ? "paused" : "resumed")).build();
+                return CommandResult.ok("麦克风已" + (paused ? "暂停" : "继续")).build();
             }
             SessionConfig.Snapshot snap = session.snapshot();
             session.setMicPaused(paused);
             return CommandResult.ok(
-                    "Mic → " + (paused ? "paused" : "resumed")
-                            + "  (was " + (prev ? "paused" : "resumed") + ")")
+                    "麦克风 → " + (paused ? "暂停" : "继续")
+                            + "（原 " + (prev ? "暂停" : "继续") + "）")
                     .effect(CommandResult.Effect.MIC_REFRESH)
                     .snapshot(snap)
                     .build();
@@ -442,16 +442,17 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            if (args == null) return CommandResult.rejected("missing args");
+            if (args == null) return CommandResult.rejected("缺少参数");
             String lvl = Json.optString(args, "level", "").trim().toLowerCase(java.util.Locale.ROOT);
             DebugLogger.Level newLevel;
             switch (lvl) {
                 case "verbose": newLevel = DebugLogger.Level.VERBOSE; break;
                 case "normal":  newLevel = DebugLogger.Level.NORMAL;  break;
                 case "quiet":   newLevel = DebugLogger.Level.QUIET;   break;
-                default: return CommandResult.rejected("unknown level: " + lvl);
+                default: return CommandResult.rejected("未知日志级别：" + lvl);
             }
-            return CommandResult.ok("Log level → " + lvl).logLevel(newLevel).build();
+            String lvlZh = "verbose".equals(lvl) ? "详细" : "normal".equals(lvl) ? "普通" : "安静";
+            return CommandResult.ok("日志级别 → " + lvlZh).logLevel(newLevel).build();
         }
     }
 
@@ -478,7 +479,7 @@ public final class BuiltInTools {
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
             // The actual clipboard write happens in MainActivity (it owns
             // the history list). We just signal it here.
-            return CommandResult.ok("Transcript → clipboard")
+            return CommandResult.ok("正在复制到剪贴板")
                     .effect(CommandResult.Effect.EXPORT_CLIPBOARD)
                     .build();
         }
@@ -507,7 +508,7 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            return CommandResult.ok("Summarizing session…")
+            return CommandResult.ok("正在总结…")
                     .effect(CommandResult.Effect.SUMMARIZE_SESSION)
                     .build();
         }
@@ -537,7 +538,7 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            return CommandResult.ok("Re-translating last turn…")
+            return CommandResult.ok("正在重新翻译…")
                     .effect(CommandResult.Effect.RETRANSLATE_LAST)
                     .build();
         }
@@ -569,7 +570,7 @@ public final class BuiltInTools {
             // MainActivity intercepts this tool name in onCommand and
             // builds the catalog from the live ToolRegistry. We just
             // signal it via a special result.
-            return CommandResult.ok("Listing commands…")
+            return CommandResult.ok("正在列出命令…")
                     .effect(CommandResult.Effect.LIST_COMMANDS)
                     .build();
         }
@@ -636,9 +637,9 @@ public final class BuiltInTools {
 
     private static String displayModeName(SessionConfig.DisplayMode m) {
         switch (m) {
-            case SOURCE_ONLY: return "source only";
-            case TARGET_ONLY: return "target only";
-            default:          return "both";
+            case SOURCE_ONLY: return "仅原文";
+            case TARGET_ONLY: return "仅译文";
+            default:          return "双语";
         }
     }
 }

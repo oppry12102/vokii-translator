@@ -710,7 +710,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             statusHint.setClickable(lastUndoable != null);
         } else {
             // All rejected — one short status line, no UNDO.
-            setStatusHint("» rejected: " + shortRejection(applied.results));
+            setStatusHint("» 已拒绝：" + shortRejection(applied.results));
         }
         maybeChase();
     }
@@ -767,7 +767,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         }
         lastUndoable = null;
         statusHint.setClickable(false);
-        setStatusHint("» Undone");
+        setStatusHint("» 已撤销");
         rebuildAllTurns();
         reconcileEngineIfNeeded();
     }
@@ -795,7 +795,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         ClipData clip = ClipData.newPlainText("Vokii transcript", text);
         ((ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE))
                 .setPrimaryClip(clip);
-        setStatusHint("» Copied " + text.length() + " chars");
+        setStatusHint("» 已复制 " + text.length() + " 字");
     }
 
     private static String appendLabel(String lang, String text) {
@@ -815,7 +815,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             idx--;
         }
         if (idx < 0) {
-            setStatusHint("» No turn to re-translate");
+            setStatusHint("» 没有可重译的句子");
             return;
         }
         final Turn original = history.get(idx);
@@ -854,12 +854,12 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                         history.set(turnIdx, newTurn);
                         sessionContext.recordUtterance(newTurn);
                         updateTurnViewAt(turnIdx);
-                        setStatusHint("» Re-translated");
+                        setStatusHint("» 已重新翻译");
                         debug.log("MT", "retranslated turn " + turnIdx);
                     });
                 }
                 @Override public void onError(String message) {
-                    runOnUiThread(() -> setStatusHint("» Re-translate failed: " + message));
+                    runOnUiThread(() -> setStatusHint("» 重译失败：" + message));
                 }
                 @Override public void onToolCalls(java.util.List<ToolCall> calls) { }
             });
@@ -873,26 +873,41 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
      *  voice-only controls — the user can ask "你能做什么" or "help" at
      *  any time and get a one-shot reference card. */
     private void replaceChipWithCommandsCatalog(int chipIndex) {
-        StringBuilder sb = new StringBuilder("» Available commands (")
-                .append(toolRegistry.names().size()).append("):\n");
+        // Chinese-only catalog with a native example per command. The tool
+        // schema descriptions stay English (they guide the LLM); this card is
+        // the user-facing discoverability surface, so it reads in Chinese
+        // with Chinese trigger examples.
+        java.util.Map<String, String> zh = new java.util.LinkedHashMap<>();
+        zh.put("set_translation_languages", "切换翻译语言 —— 例：「下面改成中日翻译」");
+        zh.put("set_display_mode", "显示模式（双语/仅原文/仅译文）—— 例：「只显示日文」");
+        zh.put("toggle_cascade", "普通 / 级联管道 —— 例：「切换到普通模式」");
+        zh.put("toggle_debug", "调试面板 —— 例：「打开调试」");
+        zh.put("set_translation_mode", "翻译风格 / 温度 —— 例：「翻译得更文雅」或「温度调到0.7」");
+        zh.put("get_current_settings", "查看当前设置 —— 例：「现在是什么设置」");
+        zh.put("clear_transcript", "清空记录 —— 例：「清空翻译」");
+        zh.put("toggle_mic", "暂停 / 继续麦克风 —— 例：「暂停」或「继续」");
+        zh.put("set_log_level", "日志详细度 —— 例：「日志设成详细」");
+        zh.put("export_transcript", "复制到剪贴板 —— 例：「复制到剪贴板」");
+        zh.put("summarize_session", "总结对话 —— 例：「总结一下」");
+        zh.put("re_translate_last", "重新翻译上一句 —— 例：「重新翻译上一句」");
+        zh.put("list_commands", "显示本帮助 —— 例：「你能做什么」");
+        StringBuilder sb = new StringBuilder("» 可用命令（直接说出来即可，中英文都行）：\n");
         for (String name : toolRegistry.names()) {
-            // Pull the description out of the tool's function schema.
-            // Avoids duplicating the catalog in a separate list.
-            String desc = "";
-            try {
-                org.json.JSONObject schema = toolRegistry.get(name).functionSchema();
-                desc = Json.optString(schema.getJSONObject("function"), "description", "");
-                // Collapse multi-line descriptions to a single short line.
-                int nl = desc.indexOf('\n');
-                if (nl > 0) desc = desc.substring(0, nl).trim();
-                if (desc.length() > 100) desc = desc.substring(0, 97) + "...";
-            } catch (Throwable ignored) {}
-            sb.append("  • ").append(name);
-            if (!desc.isEmpty()) sb.append(" — ").append(desc);
-            sb.append('\n');
+            String line = zh.get(name);
+            if (line == null) {
+                // Unknown / future tool: fall back to its schema description.
+                String desc = "";
+                try {
+                    desc = Json.optString(toolRegistry.get(name).functionSchema()
+                            .getJSONObject("function"), "description", "");
+                    int nl = desc.indexOf('\n');
+                    if (nl > 0) desc = desc.substring(0, nl).trim();
+                    if (desc.length() > 60) desc = desc.substring(0, 57) + "...";
+                } catch (Throwable ignored) {}
+                line = name + (desc.isEmpty() ? "" : " — " + desc);
+            }
+            sb.append("  • ").append(line).append('\n');
         }
-        sb.append("\nSay any of the above in Chinese or English. " +
-                "Example: \"下面改成中日翻译\" or \"open debug\".");
         if (chipIndex < 0 || chipIndex >= history.size()) return;  // cleared mid-flight
         history.set(chipIndex, Turn.command(sb.toString()));
         updateTurnViewAt(chipIndex);
@@ -909,7 +924,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             if (!t.target.isEmpty()) transcript.append(t.target).append('\n');
         }
         if (transcript.length() == 0) {
-            updateLastNoteCard("  (transcript is empty)");
+            updateLastNoteCard("  （记录为空）");
             return;
         }
         String summaryPrompt =
@@ -936,7 +951,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                         if (summary.isEmpty()) summary = text;
                         int i = lastCommandIndex();
                         if (i < 0) return;  // transcript cleared mid-flight
-                        history.set(i, Turn.command("» Summary: " + summary));
+                        history.set(i, Turn.command("» 总结：" + summary));
                         updateTurnViewAt(i);
                     });
                 }
@@ -1109,11 +1124,20 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private void refreshActiveCardText() {
         if (activeCard == null) return;
         TextView vView = verbatimIsSourceCol ? activeSourceView : activeTargetView;
+        TextView tView = verbatimIsSourceCol ? activeTargetView : activeSourceView;
         boolean show = activeHasMt
                 ? columnVisible(verbatimIsSourceCol, activeVerbatim)
                 : !activeVerbatim.isEmpty();
         vView.setVisibility(show ? View.VISIBLE : View.GONE);
         if (show) vView.setText("› " + activeVerbatim);
+        // Caption phase (no MT yet): hide the empty translate column so the
+        // verbatim caption sits on the FIRST line. A TextView defaults to
+        // VISIBLE, so the not-yet-typed translate column otherwise occupies a
+        // blank line and — when the verbatim lands in the target column (auto
+        // mode, English-led utterance) — pushes the caption down to row 2
+        // until MT fills the column and the line "jumps" up at commit. Once MT
+        // streams, applyTypedText owns this column's visibility.
+        if (!activeHasMt) tView.setVisibility(View.GONE);
         applyTypedText();
     }
 
