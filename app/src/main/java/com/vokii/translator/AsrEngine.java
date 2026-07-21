@@ -29,6 +29,11 @@ public interface AsrEngine {
          *  sentence-final commit + MT TTFB. Default empty so other engines
          *  need no override. */
         default void onPartialTranscript(String text) {}
+        /** Sentence-final verbatim transcript (ASR sentence_end). Distinct
+         *  from {@link #onPartialTranscript}: the UI locks the verbatim
+         *  column on this event — any partial arriving afterwards belongs
+         *  to the NEXT sentence. Only the cascade engine fires this. */
+        default void onFinalTranscript(String text) {}
     }
 
     void start(Callback callback);

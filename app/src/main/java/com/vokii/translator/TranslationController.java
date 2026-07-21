@@ -46,6 +46,9 @@ public class TranslationController {
          *  still speaking, so first text arrives at ASR TTFB (~0.4 s) rather
          *  than after sentence-final + MT TTFB. */
         default void onPartialTranscript(String text) {}
+        /** Sentence-final verbatim (cascade only) — the verbatim column
+         *  locks here; later partials belong to the next sentence. */
+        default void onFinalTranscript(String text) {}
         /** Something failed. */
         void onError(String where, int code, String message);
     }
@@ -73,7 +76,12 @@ public class TranslationController {
                 final String tgt = session.targetLang();
                 main.post(() -> {
                     if (!active.get()) return;
-                    TurnParser p = TurnParser.parse(text, src, tgt);
+                    // Streaming parse: labels trusted, never Han-swapped —
+                    // a mid-stream swap verdict would flip which column the
+                    // UI feeds from and wipe the line at every flip. The
+                    // final parse in onFinal below still corrects a truly
+                    // swapped pair, once, at the sentence boundary.
+                    TurnParser p = TurnParser.parseStreaming(text, src, tgt);
                     listener.onStreaming(p.source, p.target, src, tgt);
                 });
             }
@@ -103,6 +111,12 @@ public class TranslationController {
                 main.post(() -> {
                     if (!active.get()) return;
                     listener.onPartialTranscript(text);
+                });
+            }
+            @Override public void onFinalTranscript(String text) {
+                main.post(() -> {
+                    if (!active.get()) return;
+                    listener.onFinalTranscript(text);
                 });
             }
         });

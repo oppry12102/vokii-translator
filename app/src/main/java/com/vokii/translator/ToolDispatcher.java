@@ -61,6 +61,15 @@ public final class ToolDispatcher {
         if (tool == null) {
             return CommandResult.rejected("unknown tool: " + call.name);
         }
+        // Anti-hallucination net (see GroundingCues): a tool call whose
+        // trigger text carries no command cue is almost certainly the LLM
+        // misfiring on conversational content — refuse to mutate session
+        // state on its say-so. CascadeEngine pre-filters before dispatch;
+        // this is the belt-and-braces layer for any future producer.
+        if (!GroundingCues.isGrounded(call.name, call.triggerText)) {
+            return CommandResult.rejected(call.name
+                    + ": ungrounded (no command cue in trigger)");
+        }
         if (call.argsJson == null) {
             return CommandResult.rejected(call.name + ": malformed args");
         }

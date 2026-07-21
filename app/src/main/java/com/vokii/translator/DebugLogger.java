@@ -88,6 +88,10 @@ public class DebugLogger {
 
     public void log(String tag, String msg) {
         if (!shouldLog(tag)) return;
+        // Mirror to logcat in debug builds — the TextView panel is invisible
+        // in headless/emulator test runs, and logcat is the only way to
+        // capture the LAT/ASR/MT timeline off-device.
+        if (BuildConfig.DEBUG) android.util.Log.d("Vokii-" + tag, msg == null ? "" : msg);
         final String line = format(tag, msg);
         synchronized (buffer) {
             buffer.addLast(line);

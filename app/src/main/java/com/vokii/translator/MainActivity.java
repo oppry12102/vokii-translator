@@ -82,17 +82,34 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private View activeCard;
     private TextView activeSourceView;
     private TextView activeTargetView;
-    /** Latest full source text for the active card (verbatim, no "› "). */
-    private String activeSource = "";
+    /** Latest verbatim ASR text for the in-flight sentence (no "› ").
+     *  This — not the MT's re-rendered version of the same language — is
+     *  what the verbatim column shows, so the line the user is reading
+     *  never gets rewritten by a new MT generation. */
+    private String activeVerbatim = "";
+    /** True once the ASR sentence-final verbatim arrived. Caption partials
+     *  after this point belong to the NEXT sentence and must not touch
+     *  this card (it is waiting for its MT commit). */
+    private boolean verbatimFinalized;
+    /** Which column the verbatim occupies: true = source (top), false =
+     *  target (bottom). Fixed sessions: verbatim always IS the source
+     *  language. Auto (zh<->en): Han-dominant verbatim → zh/source. Decided
+     *  once per sentence at the first caption text (or first MT delta). */
+    private boolean verbatimIsSourceCol = true;
+    private boolean verbatimColDecided;
     /** False while the card shows only the live ASR caption; true once MT
      *  (final or speculative) has streamed for this sentence. */
     private boolean activeHasMt;
 
-    // ----- target-line typewriter (see feedTypewriter) -----
+    // ----- target-line typewriter (see feedTranslation) -----
     private TextView typeView;
     private String typeFull = "";
     private int typeShown;
     private boolean typeTicking;
+    /** Whether the line typeView points at is the source column. Tracked
+     *  separately from verbatimIsSourceCol because the latter resets when
+     *  the card commits while the ticker keeps draining into it. */
+    private boolean typeIsSourceCol;
     private static final int TYPE_TICK_MS = 40;
     private static final int TYPE_CATCHUP_DIVISOR = 8;
 
@@ -102,8 +119,12 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private int chaseSettledFrames;
     private int lastScrollY;
     private float maxScrollStepPx;
-    private static final int SCROLL_CHASE_DIVISOR = 4;
-    private static final float MAX_SCROLL_STEP_DP = 4.5f;
+    private static final float MAX_SCROLL_STEP_DP = 30f;
+    // Active card's high-water-mark height, set as minHeight so no in-flight
+    // shrink (verbatim REWRITE, MT reword) can reduce the card height and
+    // trigger a ScrollView clamp-up — the up-half of the vertical jitter
+    // (down-glide on grow + up-clamp on shrink). See trackCardMinHeight.
+    private int activeMaxHeight;
 
     /** Vertical gap between sentence cards — just enough to tell sentences
      *  apart without wasting space. */
@@ -144,14 +165,21 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         statusHint      = findViewById(R.id.status_hint);
         scrollTranscript = findViewById(R.id.scroll_transcript);
         maxScrollStepPx = MAX_SCROLL_STEP_DP * getResources().getDisplayMetrics().density;
-        // Follow-bottom bookkeeping. The chase scroller only ever scrolls
-        // DOWN, so any upward scrollY change means the user dragged away —
-        // stop following until they return to the bottom. Content shorter
-        // than the viewport can't be scrolled at all → always "at bottom".
+        // Follow-bottom bookkeeping. Unpin only on a genuine USER drag-up:
+        // scrollY decreasing while landing clearly above the max scroll.
+        // A y-decrease that lands AT the max is the ScrollView clamping
+        // after content at the bottom shrank (typewriter snapback
+        // unwrapping a line, an ASR caption revision, a rebuild) — pinning
+        // there would strand the chaser: nothing re-pins without a touch,
+        // and every later line piles up below the fold with the viewport
+        // frozen mid-glyph (the "English below the box" bug — the English
+        // WAS typing, just off-screen). The chase scroller only ever
+        // scrolls DOWN, so this test separates the two cases exactly.
         scrollTranscript.getViewTreeObserver().addOnScrollChangedListener(() -> {
             int y = scrollTranscript.getScrollY();
             boolean contentFits = turnsContainer.getBottom() <= scrollTranscript.getHeight();
-            if (y < lastScrollY - 2 && !programmaticScroll && !contentFits) {
+            int maxY = Math.max(0, turnsContainer.getBottom() - scrollTranscript.getHeight());
+            if (y < lastScrollY - 2 && !programmaticScroll && !contentFits && y < maxY - 2) {
                 pinned = false;
             } else if (contentFits || isAtBottom(scrollTranscript)) {
                 pinned = true;
@@ -441,35 +469,85 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         }
     }
 
-    /** Live verbatim ASR partial (cascade only). Shown as a "live caption"
-     *  line while the user is speaking so first text lands at ASR TTFB
-     *  (~0.4 s) instead of after sentence-final + MT TTFB. Only staged when
-     *  no MT card is streaming for the current sentence; once MT streams
-     *  ({@link #onStreaming}) the translation takes over the same card. */
+    /** Live verbatim ASR partial (cascade only). Shown in the verbatim
+     *  column while the user is speaking so first text lands at ASR TTFB
+     *  (~0.4 s). Keeps updating through the whole sentence — including
+     *  while speculative MT streams below/above it — until the ASR
+     *  sentence-final locks it ({@link #onFinalTranscript}). */
     @Override public void onPartialTranscript(String text) {
         if (text == null || text.isEmpty()) return;
-        if (activeCard != null && activeHasMt) {
-            // An MT card is already streaming for an earlier sentence — don't
-            // show a second caption alongside it; the next sentence's caption
-            // will stage once that card commits.
+        if (activeCard != null && verbatimFinalized) {
+            // The card is waiting for its MT commit; this partial is the
+            // next sentence's caption — it stages once the card commits.
             return;
         }
-        if (activeCard != null && text.equals(activeSource)) return;  // no change
-        activeSource = text;
+        if (activeCard != null && text.equals(activeVerbatim)) return;  // no change
+        debug.log("RNDER", "caption len=" + text.length()
+                + " change=" + (activeVerbatim.isEmpty() ? "new"
+                        : (text.startsWith(activeVerbatim) ? "extend" : "REWRITE")));
+        activeVerbatim = text;
+        decideVerbatimColumnOnce(null);
         attachActiveCard();
+        refreshActiveCardText();
+        maybeChase();
+    }
+
+    @Override public void onFinalTranscript(String text) {
+        if (text == null || text.isEmpty()) return;
+        debug.log("RNDER", "verbatim FINAL len=" + text.length());
+        activeVerbatim = text;
+        verbatimFinalized = true;
+        decideVerbatimColumnOnce(null);
+        attachActiveCard();
+        refreshActiveCardText();
         maybeChase();
     }
 
     @Override public void onStreaming(String source, String target, String srcLang, String tgtLang) {
-        // MT is streaming for this sentence — the verbatim caption (if any)
-        // becomes the bilingual card in place, at the same bottom position.
-        // The source line updates directly (that IS the transcription
-        // rhythm); the target line feeds the typewriter.
-        activeHasMt = true;
-        activeSource = source == null ? "" : source;
-        attachActiveCard();
-        feedTypewriter(target == null ? "" : target);
+        // MT is streaming for this sentence. The two columns have separate
+        // suppliers with one shared rule — VISIBLE TEXT NEVER SHRINKS:
+        //   verbatim column  ← ASR partials only (monotonic by nature)
+        //   translate column ← MT deltas, adoption-gated (feedTranslation)
+        // The MT's own rendering of the verbatim-side language is ignored
+        // here: every new MT generation regenerates it, which is what used
+        // to wipe the card ~once per second.
+        String src = source == null ? "" : source;
+        String tgt = target == null ? "" : target;
+        if (!activeHasMt) {
+            activeHasMt = true;
+            decideVerbatimColumnOnce(srcLang);
+            attachActiveCard();
+            typeView = verbatimIsSourceCol ? activeTargetView : activeSourceView;
+            typeIsSourceCol = !verbatimIsSourceCol;
+            typeFull = "";
+            typeShown = 0;
+            debug.log("RNDER", "firstMT verbatimCol=" + (verbatimIsSourceCol ? "src" : "tgt")
+                    + " vLen=" + activeVerbatim.length());
+        }
+        feedTranslation(verbatimIsSourceCol ? tgt : src);
+        refreshActiveCardText();
         maybeChase();
+    }
+
+    /** Pick the verbatim's column once per sentence: fixed-language
+     *  sessions the verbatim is always the source language; in auto
+     *  (zh<->en) a Han-dominant verbatim belongs to the zh/source column.
+     *  Called at the first caption text (or first MT delta, whichever
+     *  comes first) so the caption never has to move columns mid-sentence. */
+    private void decideVerbatimColumnOnce(String srcLang) {
+        if (verbatimColDecided) return;
+        verbatimColDecided = true;
+        if (srcLang == null) srcLang = session.sourceLang();  // caption path
+        if (!"auto".equalsIgnoreCase(srcLang)) {
+            verbatimIsSourceCol = true;  // fixed session: verbatim IS source
+            return;
+        }
+        int han = 0;
+        for (int i = 0; i < activeVerbatim.length(); i++) {
+            char c = activeVerbatim.charAt(i);
+            if (c >= 0x4E00 && c <= 0x9FFF) han++;
+        }
+        verbatimIsSourceCol = han * 2 >= activeVerbatim.length();
     }
 
     /** Finished turn: the active card freezes in place and becomes part of
@@ -489,21 +567,34 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             // commands.
             sessionContext.recordUtterance(t);
             if (activeCard != null) {
-                // Finalize in place: the source locks to the final text; the
-                // target keeps its already-typed prefix and drains the rest.
-                activeHasMt = true;
-                activeSource = src;
-                typeFull = tgt;
-                typeShown = Math.min(typeShown, typeFull.length());
-                refreshActiveCardText();
-                ensureTypeTicking();  // no-op if already drained
-                // typeView keeps pointing at this card's target line so the
-                // ticker finishes it even though the card is now history.
-                activeCard = null;
-                activeSourceView = null;
-                activeTargetView = null;
-                activeSource = "";
-                activeHasMt = false;
+                // Finalize in place, per column: the verbatim column locks
+                // to the final MT-rendered text (one authoritative set at
+                // the sentence boundary); the translate column keeps its
+                // already-typed prefix and drains the rest.
+                String vFinal = verbatimIsSourceCol ? src : tgt;
+                String tFinal = verbatimIsSourceCol ? tgt : src;
+                TextView vView = verbatimIsSourceCol ? activeSourceView : activeTargetView;
+                // The MT occasionally omits the verbatim-side label (e.g.
+                // no EN: line for a pure-English utterance) — never erase
+                // a shown verbatim with that empty parse; keep the ASR text.
+                if (vFinal.isEmpty()) vFinal = activeVerbatim;
+                debug.log("RNDER", "commit srcLen=" + src.length() + " tgtLen=" + tgt.length()
+                        + " vSameAsShown=" + vFinal.equals(activeVerbatim)
+                        + " transPrefixKept=" + commonPrefix(tFinal, typeFull.substring(0, typeShown))
+                        + "/" + typeShown);
+                if (BuildConfig.DEBUG) {
+                    debug.log("RNDER", "  typeFull=[" + typeFull + "]");
+                    debug.log("RNDER", "  tFinal  =[" + tFinal + "]");
+                }
+                vView.setText(vFinal);
+                vView.setVisibility(columnVisible(verbatimIsSourceCol, vFinal)
+                        ? View.VISIBLE : View.GONE);
+                feedTypewriter(tFinal);  // authoritative: adopts even when
+                applyTypedText();        // shorter, snapping to common prefix
+                ensureTypeTicking();     // then drains forward
+                // typeView keeps pointing at this card's translate line so
+                // the ticker finishes it even though the card is now history.
+                resetActiveCardState();
             } else {
                 // Committed without ever streaming — append a finished card.
                 turnsContainer.addView(buildTurnView(t, session.displayMode()),
@@ -936,7 +1027,8 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             turnsContainer.addView(buildTurnView(history.get(i), mode), turnLayoutParams());
         }
         if (hadActive) {
-            attachActiveCard(false);  // keep typewriter state — typing resumes
+            attachActiveCard();       // verbatim/translate state is preserved
+            refreshActiveCardText();  // in the fields, so typing resumes
             ensureTypeTicking();
         }
         maybeChase();
@@ -953,35 +1045,42 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         maybeChase();
     }
 
+    /** Detach the active card (it just committed) WITHOUT touching the
+     *  typewriter — the ticker keeps draining the now-committed card's
+     *  translate line via the still-pointing typeView. */
+    private void resetActiveCardState() {
+        activeCard = null;
+        activeSourceView = null;
+        activeTargetView = null;
+        activeVerbatim = "";
+        verbatimFinalized = false;
+        verbatimColDecided = false;
+        verbatimIsSourceCol = true;
+        activeHasMt = false;
+        activeMaxHeight = 0;
+    }
+
     /** Remove the in-flight card (if any) without committing it, and reset
      *  the typewriter. Used when listening stops/starts and on clear —
      *  mirrors the old currentTurn=null / liveAsrPartial=null reset. */
     private void dropActiveCard() {
         if (activeCard != null) {
             turnsContainer.removeView(activeCard);
-            activeCard = null;
-            activeSourceView = null;
-            activeTargetView = null;
         } else {
             // No in-flight card means typeView (if set) belongs to a
             // COMMITTED card still draining — complete it first so it
             // isn't left frozen with a half-typed target line.
             flushTypewriter();
         }
-        activeSource = "";
-        activeHasMt = false;
+        resetActiveCardState();
         typeView = null;
         typeFull = "";
         typeShown = 0;
     }
 
-    /** Ensure the in-flight card exists as the last child, then refresh its
-     *  text. Creating it also hands the typewriter a fresh target line. */
+    /** Ensure the in-flight card exists as the last child. Creating it also
+     *  points the typewriter at the translate column once MT has started. */
     private void attachActiveCard() {
-        attachActiveCard(true);
-    }
-
-    private void attachActiveCard(boolean resetTypewriter) {
         if (activeCard == null) {
             flushTypewriter();  // finish the previous card's drain, if any
             LinearLayout card = new LinearLayout(this);
@@ -992,50 +1091,119 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             card.addView(activeTargetView);
             turnsContainer.addView(card, turnLayoutParams());
             activeCard = card;
-            typeView = activeTargetView;
-            if (resetTypewriter) {
+            typeView = activeHasMt
+                    ? (verbatimIsSourceCol ? activeTargetView : activeSourceView)
+                    : null;
+            typeIsSourceCol = !verbatimIsSourceCol;
+            if (!activeHasMt) {
                 typeFull = "";
                 typeShown = 0;
             }
         }
-        refreshActiveCardText();
     }
 
-    /** Push the saved active-card state into its views. The caption phase
-     *  (pre-MT) shows "› verbatim" and bypasses the display-mode filter —
-     *  it's the only live signal the user has while speaking. */
+    /** Push the saved active-card state into its views. The verbatim column
+     *  shows "› verbatim" while in flight and bypasses the display-mode
+     *  filter during the caption phase — it's the only live signal the user
+     *  has while speaking. The translate column renders via the typewriter. */
     private void refreshActiveCardText() {
         if (activeCard == null) return;
-        if (!activeHasMt) {
-            activeSourceView.setVisibility(View.VISIBLE);
-            activeSourceView.setText("› " + activeSource);
-        } else if (session.displayMode() != SessionConfig.DisplayMode.TARGET_ONLY
-                && !activeSource.isEmpty()) {
-            activeSourceView.setVisibility(View.VISIBLE);
-            activeSourceView.setText(activeSource);
-        } else {
-            activeSourceView.setVisibility(View.GONE);
-        }
+        TextView vView = verbatimIsSourceCol ? activeSourceView : activeTargetView;
+        boolean show = activeHasMt
+                ? columnVisible(verbatimIsSourceCol, activeVerbatim)
+                : !activeVerbatim.isEmpty();
+        vView.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (show) vView.setText("› " + activeVerbatim);
         applyTypedText();
     }
 
-    // ----- target-line typewriter -----
+    /** Per-column display-mode filter: SOURCE_ONLY hides the target column,
+     *  TARGET_ONLY hides the source column — language-wise, so an English
+     *  verbatim sitting in the (bottom) target column in auto mode is
+     *  treated as the target side. */
+    private boolean columnVisible(boolean isSourceCol, String text) {
+        if (text == null || text.isEmpty()) return false;
+        return isSourceCol
+                ? session.displayMode() != SessionConfig.DisplayMode.TARGET_ONLY
+                : session.displayMode() != SessionConfig.DisplayMode.SOURCE_ONLY;
+    }
+
+    // ----- translate-line typewriter -----
     //
-    // The MT engine delivers the full accumulated target on every delta;
-    // dumping it straight into the view reads as a paragraph paste. Instead
-    // we reveal it character-by-character: every TYPE_TICK_MS the ticker
-    // advances by max(1, backlog / 8) chars — a calm ~25 chars/s baseline
-    // that automatically speeds up to drain bursts, so it always looks like
-    // typing yet never lags far behind the stream. Revisions (speculative
-    // MT rewriting a draft) snap back to the common prefix instantly, then
-    // resume typing forward.
+    // The MT engine delivers the full accumulated translate-side text on
+    // every delta; dumping it straight into the view reads as a paragraph
+    // paste. Instead we reveal it character-by-character: every
+    // TYPE_TICK_MS the ticker advances by max(1, backlog / 8) chars — a
+    // calm ~25 chars/s baseline that automatically speeds up to drain
+    // bursts, so it always looks like typing yet never lags far behind
+    // the stream.
+    //
+    // Stability rule (the anti-jump invariant): THE ADOPTED TEXT NEVER
+    // SHRINKS. Every new MT generation (speculative drafts fire ~1/s while
+    // speaking, then the final) restarts its accumulated text from empty —
+    // adopting those early deltas wiped the whole line ~once per second
+    // (measured on emulator: 15 full wipes in 30 s). feedTranslation holds
+    // a generation's deltas until its text has caught up to what we already
+    // committed to show; only then does it take over. Genuine revisions
+    // after adoption snap back to the common prefix, then resume typing.
+
+    /** Gate in front of the typewriter for streaming MT text. Commit uses
+     *  feedTypewriter directly (the final text is authoritative). Adoption
+     *  rules keep visible text stable WITHOUT letting the line freeze:
+     *  <ul>
+     *    <li>NEVER SHRINK — a fresh MT generation restarts from empty;
+     *        its deltas are held until the text catches up to the adopted
+     *        length (used to wipe the line ~1/s while speaking).</li>
+     *    <li>SMALL TAIL TRIMS ONLY — qwen-turbo rewords the head of its
+     *        own translation between drafts ("但不会…" → "不过…"). A
+     *        generation trimming more than the back quarter of what's
+     *        SHOWN is held — but only for up to ~1 s, then the newest
+     *        generation is force-adopted anyway. Without the timeout the
+     *        line froze on the first draft whenever every draft reworded
+     *        the head (observed on device with Chinese speech: English
+     *        line static all sentence, then the whole translation
+     *        appeared at commit).</li>
+     *  </ul> */
+    private void feedTranslation(String text) {
+        if (text.length() < typeFull.length()) {
+            // A younger generation still catching up — keep showing the
+            // previous text instead of wiping the line.
+            return;
+        }
+        String shown = typeFull.substring(0, typeShown);
+        if (!text.startsWith(shown)) {
+            int cp = commonPrefix(text, shown);
+            if (cp < (typeShown * 3) / 4) {
+                // Front-half reword: hold, with a 1 s fuse so the line
+                // keeps tracking the sentence (≤1 visible snap per second).
+                long now = System.nanoTime();
+                if (firstHoldNanos == 0) firstHoldNanos = now;
+                if (now - firstHoldNanos < 1_000_000_000L) {
+                    debug.log("RNDER", "trans HELD reword cp=" + cp + "/" + typeShown);
+                    return;
+                }
+                debug.log("RNDER", "trans FORCE-ADOPT after 1s hold cp=" + cp + "/" + typeShown);
+            }
+        }
+        firstHoldNanos = 0;
+        feedTypewriter(text);
+    }
+
+    /** nanoTime when the current reword-hold began; 0 = not holding. */
+    private long firstHoldNanos;
 
     private void feedTypewriter(String latestFull) {
-        String shown = typeFull.substring(0, typeShown);
-        if (!latestFull.startsWith(shown)) {
-            typeShown = commonPrefix(latestFull, shown);
-        }
+        // Never shrink the shown length mid-stream. Snapping typeShown back to
+        // the common prefix on an MT head-reword shortened the translate line,
+        // changed its wrap count, shrank the card, and ScrollView auto-clamped
+        // the viewport up — then the chaser glided back down as the text
+        // regrew, the up-then-down vertical jitter. Keep the shown LENGTH: the
+        // characters may change (the reword is real) but line count, card
+        // height and scrollY all stay put, leaving nothing to clamp. Shown
+        // only shrinks when the new text is genuinely shorter (commit's final,
+        // or a shorter generation) — a one-shot settle, not oscillation.
         typeFull = latestFull;
+        typeShown = Math.min(typeShown, typeFull.length());
         ensureTypeTicking();
     }
 
@@ -1075,24 +1243,50 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     }
 
     private void applyTypedText() {
+        // Track BEFORE the typeView==null early-return so the caption phase
+        // (typeView null, verbatim-only) also pins the card's minHeight —
+        // otherwise the firstMT transition clamps the viewport up by one line.
+        trackCardMinHeight();
         if (typeView == null) return;
         typeShown = Math.min(typeShown, typeFull.length());
         String typed = typeFull.substring(0, typeShown);
-        boolean show = session.displayMode() != SessionConfig.DisplayMode.SOURCE_ONLY
-                && !typed.isEmpty();
+        boolean show = columnVisible(typeIsSourceCol, typed);
         typeView.setVisibility(show ? View.VISIBLE : View.GONE);
         if (show) typeView.setText(typed);
+    }
+
+    /** Grow the active card's minHeight to its current measured height and
+     *  never let it shrink while in flight — so a verbatim REWRITE or any
+     *  text shrink can't reduce the card height, make ScrollView clamp the
+     *  viewport up, and jitter it back down on the next grow. (translate
+     *  rewords are already length-stable via feedTypewriter; this covers the
+     *  verbatim column's ASR revisions and any other height change.) */
+    private void trackCardMinHeight() {
+        if (activeCard == null) return;
+        int w = turnsContainer.getWidth();
+        if (w <= 0) return;  // not laid out yet
+        int wspec = View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY);
+        activeCard.measure(wspec, View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int h = activeCard.getMeasuredHeight();
+        if (h > activeMaxHeight) {
+            activeMaxHeight = h;
+            activeCard.setMinimumHeight(h);
+        }
     }
 
     // ----- chase scroller -----
     //
     // fullScroll() used to jump instantly — that's what made the window
-    // feel like it was leaping. The chaser instead runs every frame while
-    // pinned and moves a fraction of the remaining distance (capped at
-    // MAX_SCROLL_STEP_DP per frame ≈ 270 dp/s): one new line eases in over
-    // ~150 ms, bigger appends glide at a calm uniform speed. Content
-    // shrinking (clear, dropped caption) snaps immediately — animating
-    // upward motion onto removed text looks broken.
+    // feel like it was leaping. The chaser instead tracks the bottom
+    // EXACTLY each frame, capped at MAX_SCROLL_STEP_DP (≈1.8 in/s) so a
+    // big append glides for a few frames instead of snapping. Exact
+    // tracking matters during the typewriter drain: the translate line
+    // grows AT the viewport's bottom edge, so any steady-state lag leaves
+    // it mid-glyph below the fold (the earlier remaining/4 chase lagged
+    // ~half a line permanently — the user saw the English line "below the
+    // box" for the whole sentence). Content shrinking (clear, dropped
+    // caption) snaps immediately — animating upward motion onto removed
+    // text looks broken.
 
     /** Set by the chaser around its programmatic snap-up so the scroll
      *  listener doesn't mistake it for a user drag-up and un-pin. */
@@ -1115,8 +1309,8 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             int cur = scrollTranscript.getScrollY();
             int remaining = target - cur;
             if (remaining > 2) {
-                int step = Math.min(Math.max(remaining / SCROLL_CHASE_DIVISOR, 2),
-                        (int) maxScrollStepPx);
+                // Track exactly, capped so large appends glide a few frames.
+                int step = Math.min(remaining, (int) maxScrollStepPx);
                 scrollTranscript.scrollTo(0, cur + step);
                 chaseSettledFrames = 0;
                 scrollTranscript.postOnAnimation(this);

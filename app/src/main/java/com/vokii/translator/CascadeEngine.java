@@ -197,9 +197,10 @@ public class CascadeEngine implements AsrEngine {
             }
             @Override public void onResult(String text) {
                 if (!started || text == null || text.isEmpty()) return;
-                // Show the finalized verbatim immediately too — the MT TTFB
-                // (~0.5 s) after the pause would otherwise be dead time.
-                cb.onPartialTranscript(text);
+                // Sentence-final verbatim: the UI locks the verbatim column
+                // here — partials arriving after this belong to the next
+                // sentence and must not rewrite this card.
+                cb.onFinalTranscript(text);
                 // Hand the verbatim transcript to the MT worker.
                 MtRunner.executor().execute(() -> translateTurn(text));
             }
@@ -234,6 +235,13 @@ public class CascadeEngine implements AsrEngine {
                                           session.temperature(), debug);
         currentMt = mt;
         Handler main = new Handler(Looper.getMainLooper());
+        final boolean[] sawToolCalls = {false};
+        // For tool_calls turns the client fires onResult("") BEFORE
+        // onToolCalls. Defer that empty result so the grounding filter can
+        // decide the turn's fate first: a real command closes the card; a
+        // hallucinated one gets re-translated as content instead.
+        final boolean[] deferredEmptyResult = {false};
+        final boolean[] toolCallsHandled = {false};
         mt.translate(verbatim, new QwenMtClient.Listener() {
             @Override public void onReady() {
                 if (gen != mtGeneration) return;
@@ -253,17 +261,74 @@ public class CascadeEngine implements AsrEngine {
             }
             @Override public void onResult(String text) {
                 if (!started || gen != mtGeneration) return;
+                if ((text == null || text.trim().isEmpty()) && tools != null) {
+                    // Tool-calls turn — hold the empty result until
+                    // onToolCalls decides (see deferredEmptyResult above).
+                    deferredEmptyResult[0] = true;
+                    return;
+                }
                 debug.log("LAT", "mt_total_ms=" + (System.nanoTime() - t0) / 1_000_000);
+                String out = text;
+                // Chatter fallback: qwen-turbo sometimes answers short
+                // inputs conversationally ("I'm not sure what you're
+                // referring to…") instead of translating — no labels, no
+                // tool calls. Committing that would write garbage into
+                // the transcript (observed on emulator run for the
+                // one-word utterance "Questions."). Preserve the verbatim
+                // instead: the transcript keeps the heard text and simply
+                // lacks a translation for this sentence.
+                if (out != null && !out.trim().isEmpty() && !sawToolCalls[0]
+                        && !out.contains("ZH:") && !out.contains("EN:")
+                        && !out.contains("ZH：") && !out.contains("EN：")) {
+                    debug.log("MT", "chatter fallback (no labels in final MT): len="
+                            + out.length() + " → committing verbatim");
+                    out = (hanCount(verbatim) * 2 >= verbatim.length() ? "ZH: " : "EN: ")
+                            + verbatim;
+                }
+                final String committed = out;
                 main.post(() -> {
                     if (!started || gen != mtGeneration) return;
-                    cb.onFinal(text);
+                    cb.onFinal(committed);
                 });
             }
             @Override public void onToolCalls(java.util.List<ToolCall> calls) {
                 if (!started || gen != mtGeneration || calls == null || calls.isEmpty()) return;
+                toolCallsHandled[0] = true;
+                // Grounding filter: drop tool calls whose trigger text
+                // carries no command cue (see GroundingCues). qwen-turbo
+                // hallucinates commands on conversational content; with the
+                // "command wins, no translation lines" rule a hallucinated
+                // command would also erase the sentence's translation, so
+                // when EVERY call is ungrounded we re-translate the
+                // utterance as plain content (tools stripped) rather than
+                // committing nothing.
+                java.util.List<ToolCall> grounded = new java.util.ArrayList<>();
+                for (ToolCall c : calls) {
+                    if (GroundingCues.isGrounded(c.name, c.triggerText)) {
+                        grounded.add(c);
+                    } else {
+                        debug.log("CMD", "ungrounded tool_call dropped: " + c.name
+                                + " trigger=\"" + c.triggerText + "\"");
+                    }
+                }
+                if (grounded.isEmpty()) {
+                    debug.log("CMD", "all " + calls.size()
+                            + " tool call(s) ungrounded → retranslate as content");
+                    fallbackTranslateNoTools(verbatim, t0);
+                    return;
+                }
+                sawToolCalls[0] = true;
+                if (deferredEmptyResult[0]) {
+                    deferredEmptyResult[0] = false;
+                    main.post(() -> {
+                        if (!started || gen != mtGeneration) return;
+                        cb.onFinal("");  // close the card; the chip follows
+                    });
+                }
+                final java.util.List<ToolCall> keep = grounded;
                 main.post(() -> {
                     if (!started || gen != mtGeneration) return;
-                    cb.onCommand(calls);
+                    cb.onCommand(keep);
                 });
             }
             @Override public void onError(String message) {
@@ -274,9 +339,70 @@ public class CascadeEngine implements AsrEngine {
                 });
             }
         });
+        // Degenerate edge: an empty result with no tool calls arriving at
+        // all — close the card so it doesn't hang mid-state.
+        if (deferredEmptyResult[0] && !toolCallsHandled[0] && started && gen == mtGeneration) {
+            main.post(() -> {
+                if (!started || gen != mtGeneration) return;
+                cb.onFinal("");
+            });
+        }
         // translate() blocks until the turn finishes; clear the in-flight
         // reference so a later stop() doesn't cancel an already-completed call.
         currentMt = null;
+    }
+
+    /** Hallucinated-command recovery: re-translate the utterance as pure
+     *  content with the tool list stripped, so the sentence isn't lost.
+     *  Runs synchronously on the MT worker (called from within the outer
+     *  turn's listener at stream end). Gets its own generation so the
+     *  outer turn's late callbacks drop. Any failure commits the ASR
+     *  verbatim — the transcript always survives. */
+    private void fallbackTranslateNoTools(String verbatim, long t0) {
+        final long fbGen = ++mtGeneration;
+        debug.log("MT", "fallback translate (no tools) len=" + verbatim.length());
+        String prompt = MtPromptBuilder.buildSystemPrompt(sessionContext, toolRegistry);
+        QwenMtClient mt = MtRunner.client(config.getApiKey(), prompt, null,
+                                          session.temperature(), debug);
+        currentMt = mt;
+        Handler main = new Handler(Looper.getMainLooper());
+        mt.translate(verbatim, new QwenMtClient.Listener() {
+            @Override public void onReady() {
+                if (fbGen == mtGeneration)
+                    debug.log("LAT", "fallback_mt_ttfb_ms=" + (System.nanoTime() - t0) / 1_000_000);
+            }
+            @Override public void onDelta(String turnText) {
+                if (fbGen != mtGeneration) return;
+                main.post(() -> {
+                    if (started && fbGen == mtGeneration) cb.onPartial(turnText);
+                });
+            }
+            @Override public void onResult(String text) {
+                if (fbGen != mtGeneration) return;
+                String out = text;
+                if (out == null || out.trim().isEmpty()
+                        || (!out.contains("ZH:") && !out.contains("EN:")
+                            && !out.contains("ZH：") && !out.contains("EN："))) {
+                    out = (hanCount(verbatim) * 2 >= verbatim.length() ? "ZH: " : "EN: ")
+                            + verbatim;
+                }
+                final String committed = out;
+                main.post(() -> {
+                    if (started && fbGen == mtGeneration) cb.onFinal(committed);
+                });
+            }
+            @Override public void onError(String message) {
+                if (fbGen != mtGeneration) return;
+                debug.log("MT", "fallback failed: " + message + " — committing verbatim");
+                final String committed =
+                        (hanCount(verbatim) * 2 >= verbatim.length() ? "ZH: " : "EN: ")
+                                + verbatim;
+                main.post(() -> {
+                    if (started && fbGen == mtGeneration) cb.onFinal(committed);
+                });
+            }
+        });
+        if (currentMt == mt) currentMt = null;
     }
 
     // ----- P1: speculative MT on ASR partials -----
@@ -320,6 +446,17 @@ public class CascadeEngine implements AsrEngine {
                 }
                 @Override public void onDelta(String turnText) {
                     if (gen != mtGeneration) return;  // superseded — drop
+                    // Only forward drafts that actually look like a
+                    // bilingual translation. A draft that degenerated into
+                    // a tool call streams plain chatter instead of ZH:/EN:
+                    // lines; painting that over the card is worse than
+                    // keeping the previous draft (the gate can't displace
+                    // it once adopted — measured on emulator: a 53-char
+                    // garbage draft survived to commit and got swapped
+                    // wholesale, 0-char common prefix).
+                    String t = turnText == null ? "" : turnText;
+                    if (!t.contains("ZH:") && !t.contains("EN:")
+                            && !t.contains("ZH：") && !t.contains("EN：")) return;
                     main.post(() -> {
                         if (!started || gen != mtGeneration) return;
                         cb.onPartial(turnText);  // draft translation → UI
@@ -330,7 +467,16 @@ public class CascadeEngine implements AsrEngine {
                     if (gen == mtGeneration) debug.log("LAT", "spec_mt_done (draft, not committed)");
                 }
                 @Override public void onToolCalls(java.util.List<ToolCall> calls) {
-                    // Don't fire commands speculatively — the final MT will.
+                    // A translation draft must never fire commands — and a
+                    // draft that WANTS to call a tool has stopped
+                    // translating (qwen-turbo does this on partials that
+                    // resemble commands). Kill it so its non-label text
+                    // never reaches the card; the final MT is the only
+                    // command channel.
+                    if (gen == mtGeneration && calls != null && !calls.isEmpty()) {
+                        debug.log("MT", "spec draft emitted tool_call — cancelled");
+                        try { mt.cancel(); } catch (Throwable ignored) {}
+                    }
                 }
                 @Override public void onError(String message) {
                     // Silent: a failed draft just means the user waits for final.
@@ -349,6 +495,15 @@ public class CascadeEngine implements AsrEngine {
         }
     }
 
+    private static int hanCount(String s) {
+        int c = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char ch = s.charAt(i);
+            if (ch >= 0x4E00 && ch <= 0x9FFF) c++;
+        }
+        return c;
+    }
+
     /** Tear down a half-started engine: AudioRecord init failed after the
      *  ASR WebSocket was already opened. Without this, {@code started} would
      *  stay true and the socket would leak — the engine would look "running"
@@ -365,6 +520,14 @@ public class CascadeEngine implements AsrEngine {
     }
 
     private void startCapture() {
+        // DEBUG-only test hook: if a raw PCM file (16 kHz mono s16le) was
+        // pushed to the app's external files dir, stream it to the ASR at
+        // the same 20 ms cadence the mic would produce, instead of opening
+        // AudioRecord. Lets the full ASR→spec-MT→final-MT→render chain run
+        // on an emulator with no audio device (the CI emulator boots with
+        // -no-audio, so AudioRecord would only ever read silence).
+        if (BuildConfig.DEBUG && startFileFeed()) return;
+
         int minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         // Buffer = min(system_min, frame * 16). 16 frames @ 20 ms = 320 ms
@@ -426,6 +589,76 @@ public class CascadeEngine implements AsrEngine {
             }
         }, "vokii-cascade-capture");
         captureThread.start();
+    }
+
+    /** Try to start the file-feed capture path (see startCapture). Returns
+     *  true when the feed thread took over. DEBUG builds only; the file is
+     *  {@code <external-files>/feed.pcm} — raw 16 kHz mono s16le, pushed via
+     *  adb. After EOF the thread stays alive emitting silence so the server
+     *  VAD can commit the final turn and the session doesn't look dead. */
+    private boolean startFileFeed() {
+        // External location first; fall back to the internal files dir, which
+        // adb can reach via run-as on a headless emulator (scoped storage
+        // blocks /storage/emulated/Android/data/<pkg>). Assigned once so the
+        // capture lambda can capture it.
+        java.io.File ext = new java.io.File(appCtx.getExternalFilesDir(null), "feed.pcm");
+        final java.io.File f = ext.exists() ? ext
+                : new java.io.File(appCtx.getFilesDir(), "feed.pcm");
+        if (!f.exists() || f.length() < FRAME_BYTES) return false;
+        debug.log("ASR", "file feed ON: " + f.getAbsolutePath()
+                + " (" + f.length() + " bytes)");
+        captureThread = new Thread(() -> {
+            byte[] frame = new byte[FRAME_BYTES];
+            java.io.InputStream in = null;
+            try {
+                in = new java.io.BufferedInputStream(new java.io.FileInputStream(f));
+                long nextWake = System.nanoTime();
+                boolean eof = false;
+                while (started) {
+                    if (session.micPaused()) {
+                        try { Thread.sleep(50); } catch (InterruptedException ie) {
+                            if (!started) break;
+                        }
+                        continue;
+                    }
+                    int n = frame.length;
+                    if (!eof) {
+                        n = in.read(frame, 0, frame.length);
+                        if (n <= 0) {
+                            eof = true;
+                            debug.log("ASR", "file feed EOF — streaming silence");
+                            n = frame.length;
+                            java.util.Arrays.fill(frame, (byte) 0);
+                        }
+                    } else {
+                        // After EOF keep streaming silence at cadence: the
+                        // server VAD needs trailing silence to commit the
+                        // final sentence, and a quiet sender gets the task
+                        // killed (observed: WS close 1007 after ~23 s idle).
+                        java.util.Arrays.fill(frame, (byte) 0);
+                    }
+                    if (asrClient != null) {
+                        asrClient.sendAudio(frame, n);
+                    }
+                    // Pace at real time: one 20 ms frame per 20 ms.
+                    nextWake += 20_000_000L;
+                    long sleepMs = (nextWake - System.nanoTime()) / 1_000_000L;
+                    if (sleepMs > 0) {
+                        try { Thread.sleep(sleepMs); } catch (InterruptedException ie) {
+                            if (!started) break;
+                        }
+                    } else {
+                        nextWake = System.nanoTime();  // fell behind; resync
+                    }
+                }
+            } catch (Throwable t) {
+                debug.log("ASR", "file feed ex: " + t.getMessage());
+            } finally {
+                if (in != null) { try { in.close(); } catch (Throwable ignored) {} }
+            }
+        }, "vokii-cascade-filefeed");
+        captureThread.start();
+        return true;
     }
 
     @Override
