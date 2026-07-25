@@ -6,13 +6,18 @@ project adheres loosely to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Verified — real-device audio path (2026-07-25)
-- Cascade pipeline (mic → fun-asr ASR → qwen-turbo MT → UI) confirmed
-  working end-to-end on a real device, closing the "real-device
-  verification" open item in `tools/eval/REPORT.latency.tier1.cascade2.md`.
-  Mic capture and the device audio stack behave as expected — no
-  regression vs the emulator-fed eval runs. (No quantitative
-  capture-overhead numbers recorded this pass.)
+### Verified — real-device (2026-07-25)
+- **Audio path**: cascade pipeline (mic → fun-asr ASR → qwen-turbo MT →
+  UI) confirmed working end-to-end on a real device, closing the
+  "real-device verification" open item in
+  `tools/eval/REPORT.latency.tier1.cascade2.md`. Mic capture and the
+  device audio stack behave as expected — no regression vs the
+  emulator-fed eval runs. (No quantitative capture-overhead numbers
+  recorded this pass.)
+- **Speculative-MT draft flow (P1)**: draft translations surface during
+  speech and the final MT refines/commits smoothly — no flicker, no
+  stale-draft clobbering observed on real audio. Closes the last
+  device-verification blocker.
 
 ### Changed — transcript UX (no more jumping text)
 - **Per-turn cards** replace the single all-in-one TextView: committed
