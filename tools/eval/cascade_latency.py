@@ -39,6 +39,8 @@ import os
 import statistics
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -134,6 +136,32 @@ class _ParaLatCb(RecognitionCallback):
     def on_close(self): self._done.set()
 
 
+def _run_asr_step1(pcm: bytes, args) -> dict:
+    """fun-asr ASR (cascade step 1), shared by cascade2 and cascade2_prod
+    so the two MT-step variants compare on identical ASR input + timing.
+    Returns the absolute monotonic t0 plus the callback's deltas/gaps."""
+    cb = _ParaLatCb()
+    rec = Recognition(model=args.asr_model, callback=cb, format="pcm", sample_rate=16000)
+    t0 = time.monotonic()
+    rec.start()
+    FRAME = 640
+    offset = 0
+    while offset < len(pcm):
+        rec.send_audio_frame(pcm[offset:offset + FRAME]); offset += FRAME
+        time.sleep(0.005)
+    rec.stop()
+    cb._done.wait(timeout=30)
+    with cb._lock:
+        deltas = cb._deltas[:]
+        first = cb._first_text_t
+        last = cb._last_text_t
+        err = cb._err
+        text = cb._final_text
+    gaps = [b - a for a, b in zip(deltas, deltas[1:])] if len(deltas) > 1 else []
+    return {"t0": t0, "asr_text": (text or ""), "first": first, "last": last,
+            "deltas": deltas, "gaps": gaps, "err": err}
+
+
 def run_cascade1(pcm: bytes, sid: str, args) -> dict:
     if not HAVE_DASHSCOPE:
         return {"id": sid, "mode": "cascade1", "error": "dashscope SDK missing"}
@@ -205,32 +233,14 @@ def run_cascade2(pcm: bytes, sid: str, args) -> dict:
     if not HAVE_DASHSCOPE:
         return {"id": sid, "mode": "cascade2", "error": "dashscope SDK missing"}
 
-    # ---- Step 1: Paraformer ASR ----
-    cb = _ParaLatCb()
-    rec = Recognition(model=args.asr_model, callback=cb, format="pcm", sample_rate=16000)
-    pipeline_t0 = time.monotonic()
-    step1_t0 = pipeline_t0
-    try:
-        rec.start()
-        FRAME = 640
-        offset = 0
-        while offset < len(pcm):
-            rec.send_audio_frame(pcm[offset:offset + FRAME]); offset += FRAME
-            time.sleep(0.005)
-        rec.stop()
-        cb._done.wait(timeout=30)
-    finally:
-        pass  # SDK cleans up; cb._done.wait guarantees we exit before step 2
-
-    with cb._lock:
-        deltas1 = cb._deltas[:]
-        first1 = cb._first_text_t
-        last1 = cb._last_text_t
-        err1 = cb._err
-        asr_text = cb._final_text
-    step1_ttfb = (first1 - step1_t0) if first1 else None
-    step1_total = (last1 - step1_t0) if last1 else None
-    gaps1 = [b - a for a, b in zip(deltas1, deltas1[1:])] if len(deltas1) > 1 else []
+    # ---- Step 1: fun-asr ASR (shared helper _run_asr_step1) ----
+    s1 = _run_asr_step1(pcm, args)
+    pipeline_t0 = s1["t0"]
+    first1, last1 = s1["first"], s1["last"]
+    deltas1, gaps1 = s1["deltas"], s1["gaps"]
+    asr_text, err1 = s1["asr_text"], s1["err"]
+    step1_ttfb = (first1 - pipeline_t0) if first1 else None
+    step1_total = (last1 - pipeline_t0) if last1 else None
 
     if err1 or not (asr_text or "").strip():
         return {
@@ -299,7 +309,7 @@ def run_cascade2(pcm: bytes, sid: str, args) -> dict:
     if mt_deltas:
         # MT runs serially after ASR; offsets within step 2 are relative.
         if mt_deltas and mt_deltas[0] is not None and last1 is not None:
-            mt_gaps_abs = [(d - mt_deltas[0]) + (last1 - step1_t0)
+            mt_gaps_abs = [(d - mt_deltas[0]) + (last1 - pipeline_t0)
                            for d in mt_deltas]
         else:
             mt_gaps_abs = []
@@ -322,6 +332,263 @@ def run_cascade2(pcm: bytes, sid: str, args) -> dict:
         "mt_total": mt_total,
         "delta_count": len(deltas1) + len(mt_deltas),
         "n_chars_step1": len(asr_text or ""),
+        "n_chars_step2": len(mt_text or ""),
+        "error": mt_err,
+    }
+
+
+# ---------------------------------------------------------------------
+# Mode D: cascade step 1 + PRODUCTION step 2 (translate-mode fidelity)
+# ---------------------------------------------------------------------
+#
+# cascade2 above runs a SIMPLIFIED MT step (hardcoded MT_INSTRUCTIONS,
+# qwen-mt-plus via the dashscope native SDK, no tools). The production
+# app runs a heavier path: MtPromptBuilder.buildSystemPrompt (verbatim
+# CORE PRINCIPLE + auto-detect interpreter block + eavesdrop/command
+# paragraph + live SESSION CONTEXT), qwen-turbo over the OpenAI-compat
+# streaming endpoint, temperature 0.3. This mode reproduces that path
+# so mt_ttfb/mt_total reflect what the shipping app actually pays.
+#
+# No tools schema is sent: latency memory measured tools-vs-no-tools
+# TTFB at 631 vs 639 ms (noise, n=5), and CS-Dialogue samples carry no
+# voice commands so the tool_calls branch never fires. The prompt TEXT
+# (incl. the eavesdrop paragraph) IS reproduced in full because it sets
+# the prefill token count that drives TTFB.
+
+PROD_CHAT_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+
+# Python port of MtPromptBuilder.buildSystemPrompt for the production
+# default session: sourceLang="auto" (ConfigStore.DEFAULT_SRC_LANG,
+# applied at MainActivity.onCreate:153), targetLang="en", display BOTH,
+# mic listening, cascade on, no style, temperature 0.30 -> the auto
+# branch (MtPromptBuilder.java:96-121) + eavesdrop paragraph (:143-190)
+# + a static SESSION CONTEXT stub (recent cmds/utterances empty, :91-126).
+PROD_SYSTEM_PROMPT = (
+    "CORE PRINCIPLE — VERBATIM SOURCE + FREE TRANSLATION:\n"
+    "1. The line matching the SPOKEN language must be EXACTLY what the user said — "
+    "FROM THE VERY FIRST WORD to the last. Preserve every word, every "
+    "'呃'/'嗯'/'那个' filler, every repetition, every grammatical error, every "
+    "slang, every non-standard expression. Do NOT correct, improve, paraphrase, "
+    "or 'clean up' the source text. If the user said '呃那个我今天呃想要吃苹果', "
+    "output exactly that — NOT '我今天想吃苹果'.\n"
+    "2. CRITICAL FOR CODE-SWITCHING: when the user mixes English words inside a "
+    "Chinese sentence (or vice versa), keep the foreign-language words EXACTLY as "
+    "the user said them. Do NOT translate them. This applies at the START of the "
+    "sentence too — if the user starts in English and switches to Chinese, the "
+    "English opening must remain English. Example: user says 'Alright. 是这样的，"
+    "好像怎么说，是因为社会的快速发展才使我们 had to make some innovation' → ZH: "
+    "must contain the verbatim 'Alright. 是这样的...' including the English "
+    "'Alright. had to make some innovation' fragments, NOT '好的。是这样的...'.\n"
+    "3. The OTHER line is the translation. It can be styled per the user's "
+    "preferences (formal, casual, concise, literary, etc.).\n"
+    "4. Voice commands (e.g. '下面改成中日翻译', '翻译得更正式一些') are CONTROL "
+    "COMMANDS that adjust translation behavior. They are NOT part of the source "
+    "text. They do NOT affect the transcription line in any way.\n\n"
+    "You are a real-time bilingual interpreter. The user may speak either "
+    "Mandarin Chinese or English — auto-detect the spoken language.\n\n"
+    "OUTPUT FORMAT — TWO LINES, ONE LABEL EACH:\n"
+    "Line 1: the VERBATIM SOURCE TRANSCRIPT, prefixed with the matching label:\n"
+    "  - If user spoke Chinese, prefix with 'ZH: '\n"
+    "  - If user spoke English, prefix with 'EN: '\n"
+    "Line 2: the TRANSLATION into the OTHER language, prefixed with the OTHER label:\n"
+    "  - If source was Chinese, line 2 is 'EN: <English translation>'\n"
+    "  - If source was English, line 2 is 'ZH: <Chinese translation>'\n\n"
+    "RULE: line 1 is always the VERBATIM source. The label on line 1 must match "
+    "the language of the source. Line 2 is the translation with the OTHER "
+    "language's label.\n\n"
+    "EXAMPLES:\n"
+    "User says '我去学校' (Chinese) →\n"
+    "ZH: 我去学校\n"
+    "EN: I go to school\n\n"
+    "User says 'i go to school' (English) →\n"
+    "EN: i go to school\n"
+    "ZH: 我去学校\n\n"
+    "User says '呃那个我今天呃想吃苹果' (Chinese with fillers) →\n"
+    "ZH: 呃那个我今天呃想吃苹果\n"
+    "EN: Um, that, um, I want to eat an apple today\n\n"
+    "Use no labels other than 'ZH:' and 'EN:'. No extra commentary, no markdown, "
+    "no apologies.\n\n"
+    "You are EAVESDROPPING on a real conversation between two people and "
+    "translating it. Almost EVERY utterance is content to translate — even when "
+    "it mentions languages, translation, podcasts, settings, styles, or the word "
+    "'mode'. A SYSTEM CONTROL COMMAND is RARE: it is SHORT, STANDALONE, and speaks "
+    "directly TO you with an imperative verb, e.g. '下面改成中日翻译', "
+    "'只显示日文就好', '打开调试', '暂停', '复制到剪贴板', '总结一下', "
+    "'重新翻译上一句', '温度调到0.7', '你能做什么'. The available commands cover: "
+    "switching languages, hiding one language column, opening the debug panel, "
+    "pausing/resuming the microphone (toggle_mic {paused:true/false} for "
+    "'暂停'/'继续'/'mute'/'unmute'), copying the transcript, summarizing the "
+    "session, re-translating the last turn, adjusting log verbosity, changing "
+    "translation style/temperature (set_translation_mode — pass only the fields "
+    "the user mentioned; do NOT confuse the literal word '模式' with this tool: "
+    "'切换到普通模式' means toggle_cascade), and listing commands.\n"
+    "NEVER treat the following as commands — translate them instead:\n"
+    "- talking ABOUT a language, a show, or translation itself ('我会说一点日语', "
+    "'我平常还特别喜欢一个播客叫无聊斋, have you heard of it?')\n"
+    "- code-switching mid-sentence (mixing English into Chinese speech is CONTENT, "
+    "not a language-switch request)\n"
+    "- questions or quotes ('What are you actually writing about?')\n"
+    "- mentioning modes, styles, or settings in conversation.\n"
+    "Rules:\n"
+    "1. PURE control command → call the matching tool and output NO translation "
+    "lines (not even empty ones).\n"
+    "2. Mixed (a clear standalone command clause plus content) → STILL call the "
+    "tool and output NO translation lines — the command takes effect on the NEXT "
+    "utterance, so translating the current one would mislead the user.\n"
+    "3. Plain content → translate normally and DO NOT call any tool.\n"
+    "4. When unsure whether an utterance is a command, do NOT call a tool — "
+    "translate it normally. False-positive tool calls are far worse than missed "
+    "commands.\n"
+    "5. When you do call a tool, pass the exact command phrase as \"trigger_text\" "
+    "— it must appear VERBATIM in the utterance, and it must contain the command "
+    "keyword (e.g. '翻译'/'语言' for a language switch, '调试' for debug, '暂停' "
+    "for mic pause). If you cannot quote such a phrase, it is not a command — "
+    "translate instead.\n\n"
+    "SESSION CONTEXT\n"
+    "===============\n"
+    "Current state:\n"
+    "  - Source language: auto-detect (中英)\n"
+    "  - Target language: English (en)\n"
+    "  - Display mode: both languages\n"
+    "  - Mic: listening\n"
+    "  - Log level: normal\n"
+    "  - Cascade: on\n"
+    "  - Translation style: (none)\n"
+    "  - Temperature: 0.30\n\n"
+    "Use the above to disambiguate commands like \"改成中文\", \"再翻一次\", "
+    "\"undo last\", or partial references. Commands fire IMMEDIATELY, so the "
+    "current state above reflects what has actually been applied."
+)
+
+
+def _run_prod_mt(asr_text: str, api_key: str,
+                 model: str = "qwen-turbo", temperature: float = 0.3) -> dict:
+    """Production-fidelity MT step 2: OpenAI-compatible streaming chat
+    completion (mirrors QwenMtClient — qwen-turbo, stream, temperature,
+    no tools). Returns first-event / first-bilingual / last-event times
+    (monotonic), accumulated text, delta timestamps, and any error."""
+    body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": PROD_SYSTEM_PROMPT},
+            {"role": "user", "content": asr_text},
+        ],
+        "stream": True,
+        "temperature": temperature,
+    }
+    req = urllib.request.Request(
+        PROD_CHAT_URL, data=json.dumps(body).encode(),
+        headers={"Authorization": f"Bearer {api_key}",
+                 "Content-Type": "application/json",
+                 "Accept": "text/event-stream"},
+    )
+    first_t = last_t = first_bilingual_t = None
+    deltas: List[float] = []
+    text = ""
+    err: Optional[str] = None
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            for raw in r:
+                line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                if not line.startswith("data:"):
+                    continue
+                payload = line[5:].strip()
+                if payload == "[DONE]":
+                    break
+                now = time.monotonic()
+                if first_t is None:
+                    first_t = now
+                last_t = now
+                deltas.append(now)
+                try:
+                    o = json.loads(payload)
+                    choices = o.get("choices") or []
+                    if choices:
+                        delta = choices[0].get("delta") or {}
+                        content = delta.get("content") or ""
+                        if content:
+                            text += content
+                            if first_bilingual_t is None and (
+                                    "ZH:" in text or "EN:" in text):
+                                first_bilingual_t = now
+                except (ValueError, KeyError, IndexError, TypeError):
+                    pass
+    except urllib.error.HTTPError as e:
+        err = f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]}"
+    except Exception as e:
+        err = f"{type(e).__name__}: {e}"
+    return {"first_t": first_t, "last_t": last_t,
+            "first_bilingual_t": first_bilingual_t,
+            "deltas": deltas, "text": text, "err": err}
+
+
+def run_cascade2_prod(pcm: bytes, sid: str, args) -> dict:
+    """Cascade step 1 (fun-asr) + PRODUCTION step 2 (qwen-turbo over
+    OpenAI-compat streaming with the full MtPromptBuilder prompt). Same
+    shape as run_cascade2, plus mt_first_bilingual — first delta whose
+    accumulated text contains a ZH:/EN: label, the user-visible event
+    that the simplified cascade2 mt_ttfb byte-count can't surface."""
+    if not HAVE_DASHSCOPE:
+        return {"id": sid, "mode": "cascade2_prod", "error": "dashscope SDK missing"}
+
+    s1 = _run_asr_step1(pcm, args)
+    pipeline_t0 = s1["t0"]
+    first1, last1 = s1["first"], s1["last"]
+    deltas1, gaps1 = s1["deltas"], s1["gaps"]
+    asr_text, err1 = s1["asr_text"], s1["err"]
+    step1_ttfb = (first1 - pipeline_t0) if first1 else None
+    step1_total = (last1 - pipeline_t0) if last1 else None
+
+    if err1 or not asr_text.strip():
+        return {
+            "id": sid, "mode": "cascade2_prod",
+            "ttfb": step1_ttfb, "total": step1_total,
+            "step1_ttfb": step1_ttfb, "step1_total": step1_total,
+            "mt_ttfb": None, "mt_total": None, "mt_first_bilingual": None,
+            "max_delta_gap": max(gaps1) if gaps1 else 0.0,
+            "delta_count": len(deltas1),
+            "n_chars_step1": len(asr_text), "n_chars_step2": 0,
+            "error": err1 or "step1 empty",
+        }
+
+    # ---- Step 2: production MT (OpenAI-compat streaming) ----
+    step2_t0 = time.monotonic()
+    mt = _run_prod_mt(asr_text, _set_api_key(args.api_key))
+    mt_first_t, mt_last_t = mt["first_t"], mt["last_t"]
+    mt_first_bilingual_t = mt["first_bilingual_t"]
+    mt_deltas, mt_text, mt_err = mt["deltas"], mt["text"], mt["err"]
+
+    mt_ttfb = (mt_first_t - step2_t0) if mt_first_t else None
+    mt_total = (mt_last_t - step2_t0) if mt_last_t else None
+    mt_first_bilingual = ((mt_first_bilingual_t - step2_t0)
+                          if mt_first_bilingual_t else None)
+    mt_gaps = [b - a for a, b in zip(mt_deltas, mt_deltas[1:])] if len(mt_deltas) > 1 else []
+
+    pipeline_first_t = first1 if first1 else mt_first_t
+    pipeline_last_t = mt_last_t if mt_last_t else last1
+
+    combined_gaps = list(gaps1)
+    if mt_deltas:
+        if last1 is not None:
+            mt_gaps_abs = [(d - mt_deltas[0]) + (last1 - pipeline_t0) for d in mt_deltas]
+        else:
+            mt_gaps_abs = []
+        if mt_first_t and last1:
+            combined_gaps.append(mt_first_t - last1)
+        combined_gaps.extend(mt_gaps_abs)
+
+    return {
+        "id": sid, "mode": "cascade2_prod",
+        "ttfb": (pipeline_first_t - pipeline_t0) if pipeline_first_t else None,
+        "total": (pipeline_last_t - pipeline_t0) if pipeline_last_t else None,
+        "max_delta_gap": max(combined_gaps) if combined_gaps else 0.0,
+        "step1_ttfb": step1_ttfb,
+        "step1_total": step1_total,
+        "mt_ttfb": mt_ttfb,
+        "mt_total": mt_total,
+        "mt_first_bilingual": mt_first_bilingual,
+        "delta_count": len(deltas1) + len(mt_deltas),
+        "n_chars_step1": len(asr_text),
         "n_chars_step2": len(mt_text or ""),
         "error": mt_err,
     }
@@ -353,7 +620,8 @@ def summarise(samples: List[dict]) -> dict:
     for mode, rows in by_mode.items():
         if not rows: continue
         for metric in ("ttfb", "total", "max_delta_gap",
-                       "step1_ttfb", "step1_total", "mt_ttfb", "mt_total"):
+                       "step1_ttfb", "step1_total", "mt_ttfb", "mt_total",
+                       "mt_first_bilingual"):
             vals = sorted([r[metric] for r in rows if r.get(metric) is not None])
             if not vals: continue
             out[f"{mode}.{metric}.median"] = statistics.median(vals)
@@ -397,6 +665,8 @@ async def run(args) -> int:
                 r = run_cascade1(pcm, sid, args)
             elif mode == "cascade2":
                 r = run_cascade2(pcm, sid, args)
+            elif mode == "cascade2_prod":
+                r = run_cascade2_prod(pcm, sid, args)
             else:
                 r = {"id": sid, "mode": mode, "error": "unknown mode"}
             r["wall_s"] = round(time.monotonic() - t0, 3)
@@ -435,7 +705,7 @@ def main() -> int:
     p.add_argument("--vad-threshold", type=float, default=0.3)
     p.add_argument("--trailing-silence", type=int, default=800)
     p.add_argument("--modes", default="joint,cascade1",
-                   help="comma-separated: joint, cascade1, cascade2")
+                   help="comma-separated: joint, cascade1, cascade2, cascade2_prod")
     p.add_argument("--limit", type=int, default=10)
     p.add_argument("--report", default="report.latency.json")
     args = p.parse_args()

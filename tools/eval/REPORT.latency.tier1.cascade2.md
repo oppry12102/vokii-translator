@@ -116,9 +116,12 @@ status:
    end-to-end on a real device; mic capture and the audio stack
    behave as expected through ASR → MT → UI, with no regression vs
    the emulator-fed eval runs.
-2. Translate-mode (E') latency under cascade — currently only
-   transcription mode is benchmarked; the production app uses
-   translate mode, which is a different code path. *(still open)*
+2. Translate-mode (E') latency under cascade — **✓ measured
+   2026-07-25** (`REPORT.latency.tier1.cascade2_prod.md`): the
+   production MT path (`MtPromptBuilder` + `qwen-turbo`, OpenAI-compat)
+   is **≈20 % faster to first bilingual text** (0.72 s vs 0.89 s) than
+   the simplified `qwen-mt-plus` baseline above — `qwen-turbo`'s speed
+   advantage dominates the heavier prompt. Not a blocker.
 3. Settings UI for opt-in `cascade_mode` toggle — **✓ done (v2.2.0)**;
    the `ConfigStore.java` toggle is surfaced in Settings.
 
