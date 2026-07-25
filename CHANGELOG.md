@@ -4,7 +4,7 @@ All notable changes to Vokii are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres loosely to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [v2.4.0] — 2026-07-25
 
 ### Verified — real-device (2026-07-25)
 - **Audio path**: cascade pipeline (mic → fun-asr ASR → qwen-turbo MT →
@@ -18,6 +18,14 @@ project adheres loosely to [Semantic Versioning](https://semver.org/).
   speech and the final MT refines/commits smoothly — no flicker, no
   stale-draft clobbering observed on real audio. Closes the last
   device-verification blocker.
+
+### Eval — production-fidelity MT latency
+- `tools/eval/cascade_latency.py` gains a `cascade2_prod` mode that
+  reproduces the production MT step (`MtPromptBuilder` prompt +
+  `qwen-turbo` over the OpenAI-compat endpoint). n=30 tier1: the
+  production path is **~20 % faster** to first bilingual text than the
+  simplified `qwen-mt-plus` baseline — see
+  `tools/eval/REPORT.latency.tier1.cascade2_prod.md`.
 
 ### Changed — transcript UX (no more jumping text)
 - **Per-turn cards** replace the single all-in-one TextView: committed
@@ -268,6 +276,7 @@ eval harness + minimal settings. Flash vs Pro eval showed
 end-to-end latency on tier1 (n=30): TTFB median ≈ 2.9 s, total
 median ≈ 16.5 s.
 
+[v2.4.0]: https://github.com/oppry12102/vokii-translator/releases/tag/v2.4.0
 [v2.3.0]: https://github.com/oppry12102/vokii-translator/releases/tag/v2.3.0
 [v2.2.0]: https://github.com/oppry12102/vokii-translator/releases/tag/v2.2.0
 [v2.1.0]: https://github.com/oppry12102/vokii-translator/tree/7a52129
