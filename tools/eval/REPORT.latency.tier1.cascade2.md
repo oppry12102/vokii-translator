@@ -108,15 +108,19 @@ latency dominates, not the cascade's serial hop.
 
 `CascadeEngine.java` is already wired (default `fun-asr-realtime` for
 step 1, `QwenMtClient.java` for step 2). No further changes needed
-for the latency story. The remaining open items are:
+for the latency story. Open items at time of writing, with current
+status:
 
 1. Real-device verification (mic capture overhead + HarmonyOS audio
-   stack behavior).
+   stack behavior) — **✓ verified 2026-07-25**: the cascade runs
+   end-to-end on a real device; mic capture and the audio stack
+   behave as expected through ASR → MT → UI, with no regression vs
+   the emulator-fed eval runs.
 2. Translate-mode (E') latency under cascade — currently only
    transcription mode is benchmarked; the production app uses
-   translate mode, which is a different code path.
-3. Settings UI for opt-in `cascade_mode` toggle (already wired in
-   `ConfigStore.java`, no UI yet).
+   translate mode, which is a different code path. *(still open)*
+3. Settings UI for opt-in `cascade_mode` toggle — **✓ done (v2.2.0)**;
+   the `ConfigStore.java` toggle is surfaced in Settings.
 
 ## How to reproduce
 

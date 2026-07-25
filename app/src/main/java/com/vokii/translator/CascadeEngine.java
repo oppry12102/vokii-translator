@@ -51,7 +51,7 @@ import java.util.concurrent.Executors;
  * {@code org.json} which are already on the classpath). Cold-start
  * latency will be ~100–300 ms higher than the joint path until the WS
  * connection pool warms; see
- * {@code tools/eval/REPORT.cascade.step2.md} (TODO: measure in prod).
+ * {@code tools/eval/REPORT.cascade.step2.md} (verified on a real device 2026-07-25).
  */
 public class CascadeEngine implements AsrEngine {
 
