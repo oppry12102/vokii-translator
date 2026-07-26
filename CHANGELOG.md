@@ -4,6 +4,40 @@ All notable changes to Vokii are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres loosely to [Semantic Versioning](https://semver.org/).
 
+## [v2.5.0] — 2026-07-26
+
+### Added — voice commands (13 → 16)
+- **remember_term**: persist a term→translation glossary (e.g. "记住张三叫
+  Zhang San", "人工智能简称AI"). Stored in SharedPreferences, loaded on
+  startup, injected into the MT prompt so names/terms translate
+  consistently. Also covers explicit voice corrections ("改一下张三叫 Lao
+  Zhang", "更正") — same list, one category.
+- **list_terms**: voice command to view the stored glossary as a card
+  (the glossary is otherwise prompt-only / invisible).
+- **set_font_size**: "字体变大/变小" — scale transcript text (clamp
+  [0.85, 1.6]), persisted across sessions.
+
+### Changed — MT latency
+- **Connection warmup** (`QwenMtClient.warmup`): a fire-and-forget
+  `max_tokens=1` request at engine start warms the shared OkHttp route
+  and primes the qwen-turbo implicit context cache. Measured ~292 ms
+  saved on the first MT turn (turn-1 only; steady-state unchanged).
+  Quality-neutral — the dummy output is discarded.
+
+### Eval
+- `cascade_latency.py` now surfaces qwen-turbo cache-hit tokens
+  (`mt_cached_tokens`). Finding: the implicit context cache hits ~97% of
+  the static prompt prefix; only qwen-turbo (not qwen-plus/flash) on this
+  account; streaming usage hides `cached_tokens` (provider quirk — measure
+  TTFT A/B instead).
+
+### Validation
+- **240-test command-mis-fire gate** (CS-Dialogue tier-2, qwen-turbo):
+  16-tool mis-fire 1/240 vs 13-tool baseline 3/240 — the 3 new commands
+  caused zero mis-fires. (The same gate caught and reverted a prompt
+  restructure that moved SESSION CONTEXT to the user message: 28/240
+  mis-fires.)
+
 ## [v2.4.0] — 2026-07-25
 
 ### Verified — real-device (2026-07-25)
