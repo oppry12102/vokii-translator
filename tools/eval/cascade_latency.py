@@ -475,6 +475,12 @@ def _run_prod_mt(asr_text: str, api_key: str,
         ],
         "stream": True,
         "temperature": temperature,
+        # Ask DashScope to append a final chunk carrying `usage` (incl.
+        # prompt_tokens_details.cached_tokens) so we can see whether the
+        # qwen-turbo implicit context cache is hitting on the (static)
+        # PROD_SYSTEM_PROMPT prefix. Costs one extra SSE line after the
+        # last content token — does not affect first_t / first_bilingual_t.
+        "stream_options": {"include_usage": True},
     }
     req = urllib.request.Request(
         PROD_CHAT_URL, data=json.dumps(body).encode(),
@@ -485,6 +491,7 @@ def _run_prod_mt(asr_text: str, api_key: str,
     first_t = last_t = first_bilingual_t = None
     deltas: List[float] = []
     text = ""
+    usage_obj: Optional[dict] = None
     err: Optional[str] = None
     try:
         with urllib.request.urlopen(req, timeout=120) as r:
@@ -495,31 +502,43 @@ def _run_prod_mt(asr_text: str, api_key: str,
                 payload = line[5:].strip()
                 if payload == "[DONE]":
                     break
+                try:
+                    o = json.loads(payload)
+                except (ValueError, TypeError):
+                    o = {}
+                # Final chunk (stream_options.include_usage) carries usage
+                # and an empty choices array — capture it but do NOT let it
+                # extend mt_total / deltas (it is not model output).
+                if o.get("usage"):
+                    usage_obj = o["usage"]
+                choices = o.get("choices") or []
+                if not choices:
+                    continue
                 now = time.monotonic()
                 if first_t is None:
                     first_t = now
                 last_t = now
                 deltas.append(now)
-                try:
-                    o = json.loads(payload)
-                    choices = o.get("choices") or []
-                    if choices:
-                        delta = choices[0].get("delta") or {}
-                        content = delta.get("content") or ""
-                        if content:
-                            text += content
-                            if first_bilingual_t is None and (
-                                    "ZH:" in text or "EN:" in text):
-                                first_bilingual_t = now
-                except (ValueError, KeyError, IndexError, TypeError):
-                    pass
+                delta = choices[0].get("delta") or {}
+                content = delta.get("content") or ""
+                if content:
+                    text += content
+                    if first_bilingual_t is None and (
+                            "ZH:" in text or "EN:" in text):
+                        first_bilingual_t = now
     except urllib.error.HTTPError as e:
         err = f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]}"
     except Exception as e:
         err = f"{type(e).__name__}: {e}"
+    prompt_tokens = cached_tokens = None
+    if usage_obj:
+        prompt_tokens = usage_obj.get("prompt_tokens")
+        ptd = (usage_obj.get("prompt_tokens_details") or {})
+        cached_tokens = ptd.get("cached_tokens")
     return {"first_t": first_t, "last_t": last_t,
             "first_bilingual_t": first_bilingual_t,
-            "deltas": deltas, "text": text, "err": err}
+            "deltas": deltas, "text": text, "err": err,
+            "prompt_tokens": prompt_tokens, "cached_tokens": cached_tokens}
 
 
 def run_cascade2_prod(pcm: bytes, sid: str, args) -> dict:
@@ -557,6 +576,7 @@ def run_cascade2_prod(pcm: bytes, sid: str, args) -> dict:
     mt_first_t, mt_last_t = mt["first_t"], mt["last_t"]
     mt_first_bilingual_t = mt["first_bilingual_t"]
     mt_deltas, mt_text, mt_err = mt["deltas"], mt["text"], mt["err"]
+    mt_prompt, mt_cached = mt["prompt_tokens"], mt["cached_tokens"]
 
     mt_ttfb = (mt_first_t - step2_t0) if mt_first_t else None
     mt_total = (mt_last_t - step2_t0) if mt_last_t else None
@@ -587,6 +607,10 @@ def run_cascade2_prod(pcm: bytes, sid: str, args) -> dict:
         "mt_ttfb": mt_ttfb,
         "mt_total": mt_total,
         "mt_first_bilingual": mt_first_bilingual,
+        "mt_cached_tokens": mt_cached,
+        "mt_prompt_tokens": mt_prompt,
+        "mt_cache_ratio": ((mt_cached / mt_prompt)
+                           if (mt_prompt and mt_cached is not None) else None),
         "delta_count": len(deltas1) + len(mt_deltas),
         "n_chars_step1": len(asr_text),
         "n_chars_step2": len(mt_text or ""),
@@ -621,7 +645,8 @@ def summarise(samples: List[dict]) -> dict:
         if not rows: continue
         for metric in ("ttfb", "total", "max_delta_gap",
                        "step1_ttfb", "step1_total", "mt_ttfb", "mt_total",
-                       "mt_first_bilingual"):
+                       "mt_first_bilingual",
+                       "mt_cached_tokens", "mt_prompt_tokens", "mt_cache_ratio"):
             vals = sorted([r[metric] for r in rows if r.get(metric) is not None])
             if not vals: continue
             out[f"{mode}.{metric}.median"] = statistics.median(vals)
