@@ -33,10 +33,17 @@ public final class ToolDispatcher {
          *  transcript (typically the last non-rejected one). -1 if all
          *  were rejected. */
         public final int primaryIndex;
+        /** SessionConfig snapshot taken BEFORE any tool in this batch mutated
+         *  state. For a single-mutating-tool batch this equals that tool's
+         *  own snapshot; for a multi-mutating-tool batch it captures the
+         *  true pre-batch state so UNDO rolls back every mutation, not just
+         *  the last one. Null when the batch was empty. */
+        public final SessionConfig.Snapshot preSnapshot;
 
-        Applied(List<CommandResult> results, int primaryIndex) {
+        Applied(List<CommandResult> results, int primaryIndex, SessionConfig.Snapshot preSnapshot) {
             this.results = results;
             this.primaryIndex = primaryIndex;
+            this.preSnapshot = preSnapshot;
         }
     }
 
@@ -44,13 +51,16 @@ public final class ToolDispatcher {
     public Applied apply(List<ToolCall> calls, SessionConfig session, ConfigStore config) {
         List<CommandResult> results = new ArrayList<>();
         int primary = -1;
-        if (calls == null) return new Applied(results, -1);
+        if (calls == null) return new Applied(results, -1, null);
+        // Snapshot once, before the first mutation, so UNDO restores the
+        // pre-batch state even when several tools in this batch each mutate.
+        SessionConfig.Snapshot preSnapshot = session.snapshot();
         for (ToolCall call : calls) {
             CommandResult r = dispatchOne(call, session, config);
             results.add(r);
             if (!r.rejected) primary = results.size() - 1;
         }
-        return new Applied(results, primary);
+        return new Applied(results, primary, preSnapshot);
     }
 
     private CommandResult dispatchOne(ToolCall call, SessionConfig session, ConfigStore config) {

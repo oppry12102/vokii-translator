@@ -107,13 +107,23 @@ public class AndroidSpeechEngine implements AsrEngine {
     public void stop() {
         if (!started) return;
         started = false;
+        destroyRecognizer();
+        debug.log("ASR", "stopped");
+    }
+
+    /** Tear down the live SpeechRecognizer (stop → cancel → destroy → null).
+     *  Shared by {@link #stop} and the system {@code onError} path — a system
+     *  error (NO_MATCH / SPEECH_TIMEOUT / RECOGNIZER_BUSY) used to leave
+     *  {@code sr} alive, and the next {@code start()} created a new one over
+     *  it without destroying, leaking the IPC binding until GC. Repeated
+     *  enough times the speech service refused to bind with RECOGNIZER_BUSY. */
+    private void destroyRecognizer() {
         if (sr != null) {
             try { sr.stopListening(); } catch (Throwable ignored) {}
             try { sr.cancel(); } catch (Throwable ignored) {}
             try { sr.destroy(); } catch (Throwable ignored) {}
             sr = null;
         }
-        debug.log("ASR", "stopped");
     }
 
     private class Listener implements RecognitionListener {
@@ -131,9 +141,14 @@ public class AndroidSpeechEngine implements AsrEngine {
             debug.log("ASR", "err " + error + " " + msg);
             Callback c = cb;
             if (c != null) c.onError(error, msg);
+            // System errors fire asynchronously and leave `sr` alive. Tear it
+            // down exactly as stop() does so a subsequent start() doesn't
+            // leak the old SpeechRecognizer (see destroyRecognizer).
+            destroyRecognizer();
             started = false;
         }
         @Override public void onResults(Bundle results) {
+            if (!started) return;  // stale final arrived after stop()/onError
             ArrayList<String> list = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
             String text = list == null || list.isEmpty() ? "" : list.get(0);
             debug.log("ASR", "final: " + text);
@@ -141,6 +156,7 @@ public class AndroidSpeechEngine implements AsrEngine {
             if (c != null && !text.isEmpty()) c.onFinal(text);
         }
         @Override public void onPartialResults(Bundle partialResults) {
+            if (!started) return;  // stale partial arrived after stop()/onError
             ArrayList<String> list = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
             String text = list == null || list.isEmpty() ? "" : list.get(0);
             if (text.isEmpty()) return;

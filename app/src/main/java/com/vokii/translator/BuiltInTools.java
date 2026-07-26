@@ -168,7 +168,7 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            if (args == null || !args.has("enabled")) {
+            if (args == null || !args.has("enabled") || args.isNull("enabled")) {
                 return CommandResult.rejected("缺少 enabled 参数");
             }
             boolean enabled = args.optBoolean("enabled", true);
@@ -209,7 +209,7 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            if (args == null || !args.has("enabled")) {
+            if (args == null || !args.has("enabled") || args.isNull("enabled")) {
                 return CommandResult.rejected("缺少 enabled 参数");
             }
             boolean enabled = args.optBoolean("enabled", true);
@@ -396,7 +396,7 @@ public final class BuiltInTools {
         @Override public JSONObject functionSchema() { return SCHEMA; }
 
         @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
-            if (args == null || !args.has("paused")) {
+            if (args == null || !args.has("paused") || args.isNull("paused")) {
                 return CommandResult.rejected("缺少 paused 参数");
             }
             boolean paused = args.optBoolean("paused", false);

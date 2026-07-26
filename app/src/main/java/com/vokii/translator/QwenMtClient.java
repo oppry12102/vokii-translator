@@ -138,6 +138,14 @@ public class QwenMtClient {
      *  a turn when the engine stops mid-translation. Volatile: set on the MT
      *  worker, read/cancelled from the UI thread via {@link #cancel()}. */
     private volatile Call currentCall;
+    /** Cancel flag set by {@link #cancel()} the moment the engine stops. There
+     *  is a window between CascadeEngine assigning {@code currentMt = mt} and
+     *  {@link #translate} assigning {@code currentCall} (which is built inside
+     *  translate) — a stop() that lands in that window used to no-op (currentCall
+     *  still null) and let the full turn run anyway. The flag makes translate()
+     *  bail at entry instead. */
+    private final java.util.concurrent.atomic.AtomicBoolean cancelled =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     /** Process-wide shared client. OkHttp clients own a Dispatcher (up to
      *  64 threads) + a ConnectionPool (its own cleanup thread + pooled
@@ -148,9 +156,14 @@ public class QwenMtClient {
      *  lives for the app lifetime, like the ASR client below. */
     private static final OkHttpClient SHARED_HTTP = new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(0, TimeUnit.MILLISECONDS) // streaming — cadence guarded by callTimeout
-            .callTimeout(120, TimeUnit.SECONDS)    // hard ceiling per turn so a stalled SSE
-                                                    // can't block the shared MT executor forever
+            // Per-read idle timeout. A live chat-completion stream emits
+            // chunks many times per second, so 20 s of total socket silence
+            // is an unambiguous stall (the server opened the stream then
+            // hung). readTimeout(0) let such a stall hold the single-thread
+            // MT executor for the full 120 s callTimeout, piling every
+            // following turn up behind it. 20 s fails fast → onError.
+            .readTimeout(20, TimeUnit.SECONDS)
+            .callTimeout(120, TimeUnit.SECONDS)    // hard ceiling per turn
             .build();
 
     public QwenMtClient(String apiKey, String model, DebugLogger debug) {
@@ -181,8 +194,11 @@ public class QwenMtClient {
 
     /** Abort the in-flight turn (if any). Safe to call from any thread;
      *  no-op if no turn is running. The blocked {@code execute()} in
-     *  {@link #translate} unblocks with an IOException → onError. */
+     *  {@link #translate} unblocks with an IOException → onError. Also sets
+     *  the pre-call cancel flag so a stop() that lands before translate()
+     *  assigns currentCall is honoured (translate bails at entry). */
     public void cancel() {
+        cancelled.set(true);
         Call c = currentCall;
         if (c != null && !c.isCanceled()) {
             try { c.cancel(); } catch (Throwable ignored) {}
@@ -193,6 +209,14 @@ public class QwenMtClient {
      *  until the stream ends or errors. The CascadeEngine runs this on a
      *  worker thread per turn, so the caller's event loop is not blocked. */
     public void translate(@NonNull String verbatimTranscript, @NonNull Listener l) {
+        // Pre-call cancel: the engine may have stopped in the window between
+        // assigning currentMt and reaching here. Without this the full turn
+        // ran anyway, wasting bandwidth and (worse) occupying the single-
+        // thread MT executor so the user's next real sentence queued behind it.
+        if (cancelled.get()) {
+            l.onError("cancelled before start");
+            return;
+        }
         try {
             JSONObject req = buildRequest(verbatimTranscript);
             Request httpReq = new Request.Builder()

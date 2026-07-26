@@ -34,8 +34,12 @@ public final class CrashReporter {
 
     private static final String TAG = "VokiiCrash";
     private static final String DIR = "vokii-crashes";
-    private static final SimpleDateFormat FMT =
-            new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US);
+    /** SimpleDateFormat is not thread-safe and the uncaught-exception handler
+     *  is process-wide — two threads can crash simultaneously. A shared static
+     *  instance can corrupt under concurrent access; use a ThreadLocal (as
+     *  DebugLogger does) so each crashing thread formats its own stamp. */
+    private static final ThreadLocal<SimpleDateFormat> FMT =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.US));
 
     private static volatile File crashDir;
 
@@ -74,7 +78,7 @@ public final class CrashReporter {
     }
 
     private static void writeCrash(Thread t, Throwable e) throws java.io.IOException {
-        String ts = FMT.format(new Date());
+        String ts = FMT.get().format(new Date());
         StringBuilder sb = new StringBuilder(4096);
         sb.append("---- Vokii crash ").append(ts).append(" ----\n");
         sb.append("thread: ").append(t.getName())

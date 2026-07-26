@@ -115,7 +115,7 @@ public final class SessionContext {
                 String txt = t.source.isEmpty() ? t.target : t.source;
                 String lang = t.source.isEmpty() ? t.targetLang : t.sourceLang;
                 sb.append("  - \"").append(txt).append("\"  (")
-                        .append(lang.toUpperCase()).append(")\n");
+                        .append(lang.toUpperCase(java.util.Locale.ROOT)).append(")\n");
             }
         }
         sb.append("\nUse the above to disambiguate commands like \"改成中文\", ")

@@ -8,8 +8,18 @@
 .gradle/
 build/
 local.properties
-# Per Android Studio convention: gradle wrapper jar is generated, not committed.
+# The gradle-wrapper jar IS committed (it makes the build reproducible without
+# a preinstalled Gradle). The negation below is a no-op now (nothing above
+# ignores it), kept for clarity so a future broad ignore can't silently drop it.
 !gradle/wrapper/gradle-wrapper.jar
+
+# --- Signing identity ---
+# The release keystore and its secrets never belong in version control. The
+# keystore file used to be committed (burning the app's signing identity);
+# secrets moved to local.properties. Both are gitignored here. See the security
+# note in app/build.gradle and the S1 fix note.
+keystore/
+*.jks
 
 # --- IDE ---
 .idea/

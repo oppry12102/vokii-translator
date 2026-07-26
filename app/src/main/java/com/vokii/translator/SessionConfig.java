@@ -77,8 +77,8 @@ public final class SessionConfig {
     }
 
     public void setLanguages(String src, String tgt) {
-        if (src != null && !src.trim().isEmpty()) this.sourceLang = src.trim().toLowerCase();
-        if (tgt != null && !tgt.trim().isEmpty()) this.targetLang = tgt.trim().toLowerCase();
+        if (src != null && !src.trim().isEmpty()) this.sourceLang = src.trim().toLowerCase(java.util.Locale.ROOT);
+        if (tgt != null && !tgt.trim().isEmpty()) this.targetLang = tgt.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     public void setDisplayMode(DisplayMode m) {
@@ -100,9 +100,11 @@ public final class SessionConfig {
 
     public void setMicPaused(boolean p) { this.micPaused = p; }
 
-    /** Snapshots all currently-mutable fields for an UNDO restore. */
+    /** Snapshots all currently-mutable fields for an UNDO restore. Includes
+     *  micPaused so toggle_mic is undoable (an earlier version omitted it,
+     *  leaving the mic stuck after undoing a pause). */
     public Snapshot snapshot() {
-        return new Snapshot(sourceLang, targetLang, displayMode, stylePrompt, temperature);
+        return new Snapshot(sourceLang, targetLang, displayMode, stylePrompt, temperature, micPaused);
     }
 
     /** Restores from a snapshot taken before a tool was applied. */
@@ -113,6 +115,7 @@ public final class SessionConfig {
         this.displayMode = s.displayMode;
         this.stylePrompt = s.stylePrompt;
         this.temperature = s.temperature;
+        this.micPaused = s.micPaused;
     }
 
     /** True iff the display mode is legal for the current language pair —
@@ -130,12 +133,14 @@ public final class SessionConfig {
         public final DisplayMode displayMode;
         public final String stylePrompt;
         public final float temperature;
-        Snapshot(String src, String tgt, DisplayMode dm, String sp, float temp) {
+        public final boolean micPaused;
+        Snapshot(String src, String tgt, DisplayMode dm, String sp, float temp, boolean micPaused) {
             this.sourceLang = src;
             this.targetLang = tgt;
             this.displayMode = dm;
             this.stylePrompt = sp;
             this.temperature = temp;
+            this.micPaused = micPaused;
         }
     }
 }

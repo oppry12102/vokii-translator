@@ -58,6 +58,11 @@ public class TranslationController {
     private final SessionConfig session;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final AtomicBoolean active = new AtomicBoolean(false);
+    /** Set once in {@link #cancel()} (called from Activity onDestroy). Once
+     *  true every posted callback bails, so a stop()/onError/onIdle scheduled
+     *  while the owning Activity is being torn down never touches a destroyed
+     *  view tree (the cause of intermittent 闪退 IllegalStateExceptions). */
+    private volatile boolean cancelled;
 
     public TranslationController(AsrEngine asr, SessionConfig session, Listener listener) {
         this.asr = asr;
@@ -69,7 +74,7 @@ public class TranslationController {
 
     public void start() {
         if (!active.compareAndSet(false, true)) return;
-        main.post(listener::onPreparing);
+        main.post(() -> { if (!cancelled) listener.onPreparing(); });
         asr.start(new AsrEngine.Callback() {
             @Override public void onPartial(String text) {
                 final String src = session.sourceLang();
@@ -95,10 +100,10 @@ public class TranslationController {
                 });
             }
             @Override public void onReady() {
-                main.post(listener::onListening);
+                main.post(() -> { if (!cancelled) listener.onListening(); });
             }
             @Override public void onError(int code, String message) {
-                main.post(() -> listener.onError("ASR", code, message));
+                main.post(() -> { if (!cancelled) listener.onError("ASR", code, message); });
                 stop();
             }
             @Override public void onCommand(java.util.List<ToolCall> calls) {
@@ -125,6 +130,20 @@ public class TranslationController {
     public void stop() {
         if (!active.compareAndSet(true, false)) return;
         try { asr.stop(); } catch (Throwable ignored) {}
-        main.post(listener::onIdle);
+        main.post(() -> { if (!cancelled) listener.onIdle(); });
+    }
+
+    /** Cancel the controller and drain its main-handler queue so nothing fires
+     *  after the owning Activity is destroyed. Idempotent. Unlike {@link #stop},
+     *  this does NOT post onIdle — there is no live UI to receive it by the
+     *  time this runs (Activity.onDestroy). It also stops the engine and
+     *  removes every callback the controller ever posted, which is the fix
+     *  for the post-destroy UI crashes: <code>stop()</code> alone still
+     *  scheduled an <code>onIdle</code> that ran on a dead view tree. */
+    public void cancel() {
+        cancelled = true;
+        active.set(false);
+        main.removeCallbacksAndMessages(null);
+        try { asr.stop(); } catch (Throwable ignored) {}
     }
 }

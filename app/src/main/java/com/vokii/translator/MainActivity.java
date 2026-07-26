@@ -56,6 +56,11 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     /** Snapshot of the last successfully-applied tool, used to power the
      *  UNDO Toast. Nulled out when a new tool overwrites it. */
     private CommandResult lastUndoable;
+    /** Pre-batch SessionConfig snapshot captured by the dispatcher when the
+     *  last undoable command ran. Preferred over the per-tool snapshot on
+     *  {@link #lastUndoable} so a multi-mutation batch undoes to the true
+     *  pre-batch state rather than just before the last mutation. */
+    private SessionConfig.Snapshot lastUndoSnapshot;
 
     private ScrollView scrollTranscript;
     private LinearLayout turnsContainer;
@@ -119,6 +124,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private int chaseSettledFrames;
     private int lastScrollY;
     private float maxScrollStepPx;
+    /** TURN_GAP_DP resolved to px once at onCreate; was re-computed (density
+     *  lookup + float math + cast) on every turnLayoutParams call, i.e. once
+     *  per card in a rebuild. */
+    private int turnGapPx;
     private static final float MAX_SCROLL_STEP_DP = 30f;
     // Active card's high-water-mark height, set as minHeight so no in-flight
     // shrink (verbatim REWRITE, MT reword) can reduce the card height and
@@ -129,6 +138,14 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     /** Vertical gap between sentence cards — just enough to tell sentences
      *  apart without wasting space. */
     private static final int TURN_GAP_DP = 12;
+
+    // Status-dot colors parsed once at class init — Color.parseColor allocates
+    // a Pattern + throws on bad input, and setStatus runs on every state flip
+    // (and every refreshMicStatus), so cache the ints.
+    private static final int COLOR_LISTENING = Color.parseColor("#FFFF7E5F");
+    private static final int COLOR_PREPARING = Color.parseColor("#FF7AB7FF");
+    private static final int COLOR_PAUSED    = Color.parseColor("#FFB8A53A");  // amber
+    private static final int COLOR_IDLE      = Color.parseColor("#FF6E7681");
 
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
 
@@ -165,6 +182,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         statusHint      = findViewById(R.id.status_hint);
         scrollTranscript = findViewById(R.id.scroll_transcript);
         maxScrollStepPx = MAX_SCROLL_STEP_DP * getResources().getDisplayMetrics().density;
+        turnGapPx = (int) (TURN_GAP_DP * getResources().getDisplayMetrics().density + 0.5f);
         // Follow-bottom bookkeeping. Unpin only on a genuine USER drag-up:
         // scrollY decreasing while landing clearly above the max scroll.
         // A y-decrease that lands AT the max is the ScrollView clamping
@@ -361,6 +379,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             debug.log("engine", "rebuild failed: " + t);
             return;
         }
+        if (controller != null) controller.cancel();  // drain the old one's pending callbacks
         asr = fresh;
         controller = new TranslationController(asr, session, this);
         currentEngineName = asr.name();
@@ -370,6 +389,17 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     @Override
     protected void onPause() {
         super.onPause();
+        // Privacy + cost: stop the mic + cloud streaming whenever another
+        // Activity covers this one (Settings, recents, HOME, the notification
+        // shade). Without this the ASR kept recording and the cascade kept
+        // billing tokens for audio the user didn't intend to translate, with
+        // no on-screen cue (the recording dot lives on the now-covered
+        // MainActivity). The user re-taps the mic to resume — we deliberately
+        // do NOT auto-restart on resume, since silently resuming recording
+        // would be surprising.
+        if (controller != null && controller.isActive()) {
+            controller.stop();
+        }
         // Persist the transcript so it survives process death / restart.
         if (transcriptStore != null) transcriptStore.save(history);
     }
@@ -380,7 +410,18 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         // Drop any pending typewriter ticks so they don't fire into a
         // destroyed view.
         uiHandler.removeCallbacksAndMessages(null);
-        if (controller != null) controller.stop();
+        // Cancel (not just stop) the controller: stop() posts onIdle, which
+        // would otherwise run on a destroyed view tree (the intermittent
+        // 闪退 IllegalStateException). cancel() drains the controller's own
+        // handler queue and stops the engine. Also stop the self-reposting
+        // chase scroller — View.postOnAnimation callbacks are NOT drained by
+        // the uiHandler remove above (different target), so it would keep
+        // firing into the detached view tree.
+        if (scrollTranscript != null) {
+            scrollTranscript.removeCallbacks(scrollChaser);
+            chasing = false;
+        }
+        if (controller != null) controller.cancel();
     }
 
     private void applyDebugVisibility(boolean visible) {
@@ -440,9 +481,35 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 toggleListening();
             } else {
                 debug.log("perm", "RECORD_AUDIO denied");
-                setStatus(Status.IDLE, getString(R.string.permission_required));
+                if (!ActivityCompat.shouldShowRequestPermissionRationale(
+                        this, Manifest.permission.RECORD_AUDIO)) {
+                    // "Don't ask again" selected (or a permanent-deny OEM
+                    // path): requestPermissions() will no longer show a
+                    // dialog, so the mic would be stuck off forever. Offer a
+                    // deep link to the system app-settings page where the
+                    // user can grant it manually.
+                    showMicPermissionSettingsDialog();
+                } else {
+                    setStatus(Status.IDLE, getString(R.string.permission_required));
+                }
             }
         }
+    }
+
+    /** Shown when RECORD_AUDIO was denied with "don't ask again" — the only
+     *  recovery path is the system per-app permissions page. */
+    private void showMicPermissionSettingsDialog() {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.permission_required)
+                .setMessage("麦克风权限已被拒绝且设为不再询问。请到系统设置中手动开启录音权限后返回重试。")
+                .setPositiveButton("去设置", (d, w) -> {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(android.net.Uri.fromParts("package", getPackageName(), null));
+                    try { startActivity(intent); } catch (Throwable ignored) {}
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .setCancelable(false)
+                .show();
     }
 
     // ----- TranslationController.Listener -----
@@ -566,6 +633,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             // recent utterance for "再翻一次" / partial-reference style
             // commands.
             sessionContext.recordUtterance(t);
+            trimHistoryIfNeeded();
             if (activeCard != null) {
                 // Finalize in place, per column: the verbatim column locks
                 // to the final MT-rendered text (one authoritative set at
@@ -633,6 +701,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                     || primary.effects.contains(CommandResult.Effect.LIST_COMMANDS);
             if (addsNoteCard) {
                 history.add(Turn.command(formatChip(primary, primaryCall)));
+                trimHistoryIfNeeded();
                 // Insert at the history index, NOT plain append: when an
                 // active (in-flight) card is showing it must stay the last
                 // child, and the note card belongs right before it.
@@ -706,6 +775,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             // is the tap target.
             if (primary.sessionSnapshot != null) {
                 lastUndoable = primary;
+                lastUndoSnapshot = applied.preSnapshot;  // pre-batch state for UNDO
             }
             statusHint.setClickable(lastUndoable != null);
         } else {
@@ -754,11 +824,19 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private void undoLastCommand() {
         if (lastUndoable == null) return;
         CommandResult r = lastUndoable;
-        if (r.sessionSnapshot != null) {
-            session.restore(r.sessionSnapshot);
+        // Prefer the pre-batch snapshot (restores every mutation in the batch)
+        // over the single-tool snapshot on the result — for a batch like
+        // [set_languages, set_languages] the per-tool snapshot only captured
+        // the state right before the LAST call.
+        SessionConfig.Snapshot snap = lastUndoSnapshot != null ? lastUndoSnapshot : r.sessionSnapshot;
+        if (snap != null) {
+            session.restore(snap);
             config.setSourceLang(session.sourceLang());
             config.setTargetLang(session.targetLang());
             config.setDisplayMode(session.displayMode().key());
+            // temperature is persisted across sessions, so restore it too —
+            // otherwise a restart would silently revert the undo.
+            config.setTemperature(session.temperature());
         }
         if (r.prevCascade != null) config.setCascadeMode(r.prevCascade);
         if (r.prevDebug != null) {
@@ -766,10 +844,16 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             applyDebugVisibility(r.prevDebug);
         }
         lastUndoable = null;
+        lastUndoSnapshot = null;
         statusHint.setClickable(false);
         setStatusHint("» 已撤销");
         rebuildAllTurns();
         reconcileEngineIfNeeded();
+        // Snapshot now captures micPaused — reflect a restored flip in the
+        // status row. (The capture loop reads session.micPaused() directly,
+        // so the mic itself resumes/pauses automatically; this just updates
+        // the dot/label.)
+        refreshMicStatus();
     }
 
     /** export_transcript handler: serialize current history to plain text
@@ -782,11 +866,19 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             if (t.kind == Turn.Kind.COMMAND) {
                 sb.append(t.commandText).append('\n');
             } else {
+                // Use each turn's OWN language (stored on Turn) so a language
+                // switch mid-session doesn't mislabel all prior turns with the
+                // current session language. Fall back to the session langs for
+                // legacy persisted turns that carry none.
+                String srcLang = (t.sourceLang != null && !t.sourceLang.isEmpty())
+                        ? t.sourceLang : session.sourceLang();
+                String tgtLang = (t.targetLang != null && !t.targetLang.isEmpty())
+                        ? t.targetLang : session.targetLang();
                 if (!t.source.isEmpty()) {
-                    sb.append(appendLabel(session.sourceLang(), t.source)).append('\n');
+                    sb.append(appendLabel(srcLang, t.source)).append('\n');
                 }
                 if (!t.target.isEmpty() && mode != SessionConfig.DisplayMode.SOURCE_ONLY) {
-                    sb.append(appendLabel(session.targetLang(), t.target)).append('\n');
+                    sb.append(appendLabel(tgtLang, t.target)).append('\n');
                 }
                 sb.append('\n');
             }
@@ -800,7 +892,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
 
     private static String appendLabel(String lang, String text) {
         if (lang == null) return text;
-        return lang.toUpperCase() + ": " + text;
+        return lang.toUpperCase(java.util.Locale.ROOT) + ": " + text;
     }
 
     /** re_translate_last handler: find the most recent TRANSLATION turn
@@ -835,6 +927,11 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 @Override public void onDelta(String t) { }
                 @Override public void onResult(String text) {
                     runOnUiThread(() -> {
+                        // The Activity may have been destroyed/finishing while
+                        // the LLM call was in flight (rotation is now handled
+                        // in-place via configChanges, but back/leave still
+                        // destroys) — bail before touching the view tree.
+                        if (isFinishing() || isDestroyed()) return;
                         // The transcript may have changed under us while the
                         // MT call was in flight (clear_transcript, new turns,
                         // another retranslate). Re-validate the captured index
@@ -859,7 +956,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                     });
                 }
                 @Override public void onError(String message) {
-                    runOnUiThread(() -> setStatusHint("» 重译失败：" + message));
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        setStatusHint("» 重译失败：" + message);
+                    });
                 }
                 @Override public void onToolCalls(java.util.List<ToolCall> calls) { }
             });
@@ -945,6 +1045,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 @Override public void onDelta(String t) { }
                 @Override public void onResult(String text) {
                     runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
                         TurnParser p = TurnParser.parse(text, "zh", "en");
                         // Replace the in-progress note card with the summary.
                         String summary = p.source.isEmpty() ? p.target : p.source;
@@ -956,7 +1057,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                     });
                 }
                 @Override public void onError(String message) {
-                    runOnUiThread(() -> updateLastNoteCard("  (failed: " + message + ")"));
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        updateLastNoteCard("  (failed: " + message + ")");
+                    });
                 }
                 @Override public void onToolCalls(java.util.List<ToolCall> calls) { }
             });
@@ -982,7 +1086,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = (int) (TURN_GAP_DP * getResources().getDisplayMetrics().density + 0.5f);
+        lp.bottomMargin = turnGapPx;
         return lp;
     }
 
@@ -1060,6 +1164,20 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         maybeChase();
     }
 
+    /** Keep the in-memory history and its mirrored view list bounded at
+     *  {@link TranscriptStore#MAX_TURNS} so a long session can't grow the
+     *  ScrollView's child list (whose layout is O(children)) without limit.
+     *  TranscriptStore already trims on save, but without this the live list
+     *  grew unbounded and the overflow was silently dropped on the next
+     *  restart. Both lists are trimmed from the front (oldest first) so
+     *  indices stay aligned with the active card (always the last child). */
+    private void trimHistoryIfNeeded() {
+        while (history.size() > TranscriptStore.MAX_TURNS) {
+            history.remove(0);
+            if (turnsContainer.getChildCount() > 0) turnsContainer.removeViewAt(0);
+        }
+    }
+
     /** Detach the active card (it just committed) WITHOUT touching the
      *  typewriter — the ticker keeps draining the now-committed card's
      *  translate line via the still-pointing typeView. */
@@ -1073,6 +1191,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         verbatimIsSourceCol = true;
         activeHasMt = false;
         activeMaxHeight = 0;
+        firstHoldNanos = 0;  // clear the reword-hold fuse so it can't leak into the next sentence
     }
 
     /** Remove the in-flight card (if any) without committing it, and reset
@@ -1401,10 +1520,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     private void setStatus(Status s, String label) {
         int color;
         switch (s) {
-            case LISTENING:   color = Color.parseColor("#FFFF7E5F"); break;
-            case PREPARING:   color = Color.parseColor("#FF7AB7FF"); break;
-            case PAUSED:       color = Color.parseColor("#FFB8A53A"); break;  // amber
-            default:          color = Color.parseColor("#FF6E7681");
+            case LISTENING:   color = COLOR_LISTENING; break;
+            case PREPARING:   color = COLOR_PREPARING; break;
+            case PAUSED:      color = COLOR_PAUSED;    break;  // amber
+            default:          color = COLOR_IDLE;
         }
         GradientDrawable d = new GradientDrawable();
         d.setShape(GradientDrawable.OVAL);

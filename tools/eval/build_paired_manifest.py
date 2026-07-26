@@ -62,6 +62,10 @@ def print_playlist(rows: List[dict]) -> None:
 
 
 def main() -> int:
+    # Print ref (Chinese) safely on a Windows cp1252/gbk console; no-op on
+    # Linux/macOS where stdout is already utf-8.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     p = argparse.ArgumentParser(description=(
         "Build a paired-manifest for audio_diff from your recorded prod audio."
     ))

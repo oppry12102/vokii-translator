@@ -46,10 +46,20 @@ android {
 
     signingConfigs {
         release {
+            // Signing secrets come from local.properties (gitignored) so the
+            // credentials never live in version control — they used to be
+            // hardcoded here AND the keystore file was committed, which burned
+            // the app's signing identity. The keystore file is now gitignored
+            // too. A checkout that hasn't populated local.properties fails
+            // assembleRelease loudly (empty store/key) rather than embedding
+            // creds into the build script.
+            Properties sp = new Properties()
+            File lpf = rootProject.file('local.properties')
+            if (lpf.exists()) { lpf.withInputStream { sp.load(it) } }
             storeFile file("../keystore/vokii-release.jks")
-            storePassword "***REMOVED***123"
-            keyAlias "***REMOVED***"
-            keyPassword "***REMOVED***123"
+            storePassword sp.getProperty('vokii.storePassword', '')
+            keyAlias sp.getProperty('vokii.keyAlias', '')
+            keyPassword sp.getProperty('vokii.keyPassword', '')
         }
     }
 
@@ -62,11 +72,18 @@ android {
             shrinkResources true
             signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            lintOptions {
-                abortOnError false
-                checkReleaseBuilds false
-            }
         }
+    }
+    // Release lint: was disabled entirely (lintOptions{abortOnError false;
+    // checkReleaseBuilds false} inside the release buildType), which hid the
+    // security/correctness detectors (HardcodedCredentials, AllowBackup,
+    // PackagedPrivateKey, …). Now we RUN them on release and surface findings,
+    // but keep abortOnError=false so a fresh set of pre-existing lint issues
+    // can be triaged before they start failing release builds. Flip to true
+    // once the findings are resolved.
+    lint {
+        checkReleaseBuilds true
+        abortOnError false
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -83,27 +100,32 @@ android {
     }
 }
 
-// After every Gradle build, copy the APKs of the variants that were actually
-// assembled in THIS invocation up to the parent `work/` folder. Gating on the
-// executed task graph matters: an unconditional copy re-uploads a stale APK
-// from days ago with a fresh mtime, making an old release build look current
-// (this actually bit us — release lagged debug by 3 days of commits).
-// dst mtime is set to src's so the artifact's age stays honest.
-gradle.buildFinished { result ->
-    try {
-        def executed = gradle.taskGraph.allTasks.collect { it.name } as Set
-        def workDir = rootProject.projectDir.parentFile
-        [debug: 'assembleDebug', release: 'assembleRelease'].each { variant, assemble ->
-            def src = new File(project.buildDir, "outputs/apk/${variant}/app-${variant}.apk")
-            if (executed.contains(assemble) && src.exists()) {
-                def dst = new File(workDir, "vokii-${variant}.apk")
-                dst.bytes = src.bytes
-                dst.setLastModified(src.lastModified())
-                println "[vokii-copy] vokii-${variant}.apk (${src.length()} bytes) -> ${dst}"
-            }
+// Copy each variant's APK into the parent work/ folder after it's assembled,
+// so the artifact is where the device-install scripts expect it. Uses
+// finalizedBy (Gradle's lifecycle hook) instead of the deprecated
+// gradle.buildFinished. finalizedBy only fires when the assemble task itself
+// ran, so a build that didn't assemble a variant never touches (and never
+// re-mtimes) its APK — that fixes the stale-APK-as-fresh bug the old
+// unconditional copy produced (release once looked 3 days fresh).
+def vokiiWorkDir = rootProject.projectDir.parentFile
+['debug', 'release'].each { variant ->
+    def copyTask = tasks.register("copyVokii${variant.capitalize()}Apk") {
+        doLast {
+            def src = layout.buildDirectory
+                    .file("outputs/apk/${variant}/app-${variant}.apk").get().asFile
+            if (!src.exists()) return
+            def dst = new File(vokiiWorkDir, "vokii-${variant}.apk")
+            dst.bytes = src.bytes
+            dst.setLastModified(src.lastModified())  // keep the artifact's age honest
+            println "[vokii-copy] vokii-${variant}.apk (${src.length()} bytes) -> ${dst}"
         }
-    } catch (Throwable t) {
-        logger.warn("[vokii-copy] " + t.message)
+    }
+    // Wire finalizedBy after evaluation — the AGP assemble* tasks are
+    // registered lazily and don't exist yet at this point in configuration,
+    // so tasks.named('assembleDebug') throws "not found" during evaluation.
+    afterEvaluate {
+        def asm = tasks.findByName("assemble${variant.capitalize()}")
+        if (asm != null) asm.finalizedBy copyTask
     }
 }
 
@@ -113,7 +135,12 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'org.json:json:20231013'
+    // org.json is provided by the Android framework (android.jar) at both
+    // compile and runtime on device — the standalone artifact is redundant in
+    // the shipped APK. It's kept as testImplementation only because JVM unit
+    // tests (app/src/test) run against android.jar whose org.json is stubbed
+    // ("not mocked") and need a real implementation.
+    testImplementation 'org.json:json:20231013'
 
     testImplementation 'junit:junit:4.13.2'
 

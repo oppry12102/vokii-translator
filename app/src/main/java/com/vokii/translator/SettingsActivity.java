@@ -78,10 +78,24 @@ public class SettingsActivity extends AppCompatActivity {
         return true;
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Persist even when the user leaves via HOME / recents (not just the
+        // back path). Without this a pasted API key or a flipped switch that
+        // was never committed by pressing back is lost: onCreate re-runs with
+        // a blank field / old toggle, and the write never happened.
+        persist();
+    }
+
     private void persistAndFinish() {
+        persist();
+        finish();
+    }
+
+    private void persist() {
         config.setApiKey(inputApiKey.getText().toString());
         config.setCascadeMode(switchCascade.isChecked());
         config.setDebugVisible(switchDebug.isChecked());
-        finish();
     }
 }

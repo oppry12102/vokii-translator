@@ -89,8 +89,6 @@ def length_buckets(report: dict) -> dict:
     for label, pred in _BUCKETS:
         sub = []
         for r in rows:
-            n = r.get("n_ref_tokens") or len((r.get("ref") or r.get("hyp") or ""))
-            n = min(n, 999)  # use the metadata tag when present
             # n_ref_tokens when present is the **post-tokenization** count
             # (from mixed_error_rate); for short rows that count may be 1.
             tag = r.get("n_ref_tokens")
@@ -111,10 +109,16 @@ def name_of(report: dict, path: Path) -> str:
     bits = []
     if cfg.get("model"):
         m = cfg["model"]
-        bits.append(("flash" if "flash" in m else
-                     "paraformer" if "paraformer" in m else
-                     "qwen-omni-plus" if "plus" in m else
+        # Order matters: the omni-plus and omni-flash model ids both contain
+        # "omni" and the flash id contains "flash", so "plus" must be tested
+        # before "flash". The old ladder tested "flash" first, which labelled
+        # every omni-flash model plain "flash" and made the trailing
+        # "qwen-omni-flash" branch unreachable — so a Plus-vs-Flash A/B showed
+        # two identical "flash" columns.
+        bits.append(("qwen-omni-plus" if "plus" in m else
                      "qwen-omni-flash" if "flash" in m else
+                     "paraformer" if "paraformer" in m else
+                     "fun-asr" if "fun" in m else
                      m))
     if cfg.get("instructions"):
         bits.append("instr=" + cfg["instructions"])

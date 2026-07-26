@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- All Vokii endpoints are wss:// or https:// (DashScope). Cleartext is
-     disallowed globally; no domain needs it. -->
+     disallowed globally; no domain needs it. Only the SYSTEM CA store is
+     trusted — trusting <certificates src="user" /> would let a
+     user/MDM-installed root CA MITM the WSS stream and capture the
+     Authorization: Bearer header (the API key). (If a debug variant ever
+     needs to pin a proxy cert, give it its own debug networkSecurityConfig
+     overlay rather than trusting user CAs globally.) -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

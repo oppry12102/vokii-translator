@@ -262,6 +262,10 @@ def run(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    # Print ref/hyp (Chinese) safely on a Windows cp1252/gbk console; no-op on
+    # Linux/macOS where stdout is already utf-8.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     p = argparse.ArgumentParser(description=(
         "Cascade step 2 — Paraformer-V2 (ASR) + qwen-plus (text-MT) end-to-end."
     ))

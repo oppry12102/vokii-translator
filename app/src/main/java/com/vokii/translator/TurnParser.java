@@ -80,11 +80,16 @@ final class TurnParser {
         if (s.startsWith("{")) {
             try {
                 JSONObject o = new JSONObject(extractJson(s));
+                // srcLang/tgtLang are lowercase BCP-47 codes, but the prompt
+                // shows the model UPPERCASE labels (ZH:/EN:/JA:). A JSON-
+                // deviating LLM therefore tends to use uppercase keys, which
+                // the lowercase lookup missed — producing two empty columns.
+                // Check both cases.
                 return streaming
-                        ? new TurnParser(Json.optString(o, srcLang, "").trim(),
-                                         Json.optString(o, tgtLang, "").trim())
-                        : route(Json.optString(o, srcLang, "").trim(),
-                                Json.optString(o, tgtLang, "").trim(),
+                        ? new TurnParser(jsonGetCI(o, srcLang).trim(),
+                                         jsonGetCI(o, tgtLang).trim())
+                        : route(jsonGetCI(o, srcLang).trim(),
+                                jsonGetCI(o, tgtLang).trim(),
                                 srcLang, tgtLang);
             } catch (Throwable ignored) { /* fall through to line parsing */ }
         }
@@ -124,8 +129,10 @@ final class TurnParser {
         if (s.startsWith("{")) {
             try {
                 JSONObject o = new JSONObject(extractJson(s));
-                String src = Json.optString(o, "zh", "").trim();
-                String tgt = Json.optString(o, "en", "").trim();
+                // See parse(): the prompt shows uppercase ZH:/EN: labels, so a
+                // JSON deviation uses uppercase keys — check both cases.
+                String src = jsonGetCI(o, "zh").trim();
+                String tgt = jsonGetCI(o, "en").trim();
                 return streaming ? new TurnParser(src, tgt) : route(src, tgt, "zh", "en");
             } catch (Throwable ignored) { /* fall through */ }
         }
@@ -228,11 +235,27 @@ final class TurnParser {
         return s;
     }
 
+    /** Leading-whitespace/label-residue stripper, pre-compiled — clean() runs
+     *  once per column per streaming delta (hundreds of times per turn), and
+     *  String.replaceAll recompiles the Pattern on every call. */
+    private static final java.util.regex.Pattern LEADING_NOISE =
+            java.util.regex.Pattern.compile("^[\\s:：]+");
+
     private static String clean(String s) {
         if (s == null) return "";
         // Strip leading whitespace, the other label's residue, and stray
         // newlines so consecutive deltas concatenate cleanly.
-        return s.replaceAll("^[\\s:：]+", "").trim();
+        return LEADING_NOISE.matcher(s).replaceFirst("").trim();
+    }
+
+    /** Case-insensitive lookup for a JSON key, trying the lowercase (canonical)
+     *  form first, then the UPPERCASE form (the label the LLM was shown in the
+     *  prompt). Returns "" if neither key is present. */
+    private static String jsonGetCI(JSONObject o, String key) {
+        if (key == null || key.isEmpty()) return "";
+        String v = Json.optString(o, key, "");
+        if (v.isEmpty()) v = Json.optString(o, key.toUpperCase(java.util.Locale.ROOT), "");
+        return v;
     }
 
     private static int han(String s) {

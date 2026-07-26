@@ -4,9 +4,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- ACCESS_WIFI_STATE removed — the app talks to one fixed wss://
+         DashScope endpoint and never queries Wi-Fi-specific state.
+         INTERNET + ACCESS_NETWORK_STATE cover connectivity. -->
 
     <uses-feature android:name="android.hardware.microphone" android:required="true" />
 
@@ -25,7 +27,14 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|fontScale|locale">
+            <!-- Handle config changes without recreating the Activity. The
+                 layout is a single ScrollView + ConstraintLayout with no
+                 orientation/locale-specific resources, so an in-flight ASR
+                 session, the typewriter position, and the UNDO snapshot
+                 survive a rotation or font-scale change instead of being
+                 destroyed and re-created. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

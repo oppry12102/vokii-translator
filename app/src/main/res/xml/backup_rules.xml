@@ -1,2 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<full-backup-content />
+<!-- Exclude vokii_prefs from full backup: it holds the user's optional API-key
+     override (KEY_API_KEY) typed into Settings, which must not be mirrored to
+     Google Drive / device-transfer backups. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="vokii_prefs.xml" />
+</full-backup-content>

@@ -38,6 +38,12 @@ public class QwenOmniEngine implements AsrEngine {
     private Thread captureThread;
     private Callback cb;
     private volatile boolean started;
+    /** Session identity — bumped on every start(). Each anonymous WS listener
+     *  captures the sid it was created with and bails on every callback if
+     *  {@code sid != sessionSeq}, so a stale frame from the previous session's
+     *  closing socket can't deliver text to — or stop()/tear down — the
+     *  current session (see CascadeEngine for the full rationale). */
+    private volatile long sessionSeq;
 
     public QwenOmniEngine(Context ctx, ConfigStore config, DebugLogger debug) {
         this.appCtx = ctx.getApplicationContext();
@@ -65,22 +71,32 @@ public class QwenOmniEngine implements AsrEngine {
         }
 
         started = true;
+        // Capture this session's identity + callback snapshot so a stale WS
+        // callback from the previous session's closing socket can't act on
+        // (or stop()) the current one.
+        final long sid = ++sessionSeq;
+        final Callback cb0 = callback;
         client = new QwenOmniRealtimeClient(config, debug);
         client.connect(new QwenOmniRealtimeClient.Listener() {
             @Override public void onReady() {
-                if (!started) return;
+                if (sid != sessionSeq || !started) return;
                 startCapture();
-                cb.onReady();
+                cb0.onReady();
             }
             @Override public void onDelta(String turnText) {
-                if (started) cb.onPartial(turnText);
+                if (sid != sessionSeq || !started) return;
+                cb0.onPartial(turnText);
             }
             @Override public void onResult(String text) {
-                if (started) cb.onFinal(text);
+                if (sid != sessionSeq || !started) return;
+                cb0.onFinal(text);
             }
             @Override public void onError(String message) {
-                if (started) cb.onError(-1, message);
-                stop();
+                // Only act if this socket still owns the current session; a
+                // stale onError from the previous session's closing socket
+                // must not tear down the new one.
+                if (sid == sessionSeq && started) cb0.onError(-1, message);
+                if (sid == sessionSeq) stop();
             }
             @Override public void onClosed() {
                 debug.log("ASR", "WS closed");
@@ -146,10 +162,19 @@ public class QwenOmniEngine implements AsrEngine {
     public void stop() {
         if (!started) return;
         started = false;
+        // Invalidate this session so in-flight WS callbacks bail.
+        sessionSeq++;
         Thread t = captureThread;
         captureThread = null;
         if (t != null) {
             try { t.interrupt(); } catch (Throwable ignored) {}
+            // Wait briefly for the capture loop's finally (r.stop()/r.release()) —
+            // a blocking native read() isn't unblocked by interrupt(), so a
+            // rapid start()→stop()→start() could otherwise re-open AudioRecord
+            // before the previous one released it.
+            try { t.join(200); } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
         }
         if (client != null) {
             try { client.close(); } catch (Throwable ignored) {}
