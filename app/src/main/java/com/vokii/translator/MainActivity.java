@@ -922,7 +922,8 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         QwenMtClient mt = MtRunner.client(config.getApiKey(), prompt, tools,
                 session.temperature(), debug);
         MtRunner.executor().execute(() -> {
-            mt.translate(sourceText, new QwenMtClient.Listener() {
+            mt.translate(MtPromptBuilder.buildUserMessage(sessionContext, sourceText),
+                    new QwenMtClient.Listener() {
                 @Override public void onReady() { }
                 @Override public void onDelta(String t) { }
                 @Override public void onResult(String text) {

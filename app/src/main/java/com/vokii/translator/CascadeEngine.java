@@ -301,7 +301,8 @@ public class CascadeEngine implements AsrEngine {
         // hallucinated one gets re-translated as content instead.
         final boolean[] deferredEmptyResult = {false};
         final boolean[] toolCallsHandled = {false};
-        mt.translate(verbatim, new QwenMtClient.Listener() {
+        mt.translate(MtPromptBuilder.buildUserMessage(sessionContext, verbatim),
+                new QwenMtClient.Listener() {
             @Override public void onReady() {
                 if (gen != mtGeneration.get()) return;
                 debug.log("LAT", "mt_ttfb_ms=" + (System.nanoTime() - t0) / 1_000_000);
@@ -425,7 +426,8 @@ public class CascadeEngine implements AsrEngine {
                                           session.temperature(), debug);
         currentMt = mt;
         Handler main = mainHandler;
-        mt.translate(verbatim, new QwenMtClient.Listener() {
+        mt.translate(MtPromptBuilder.buildUserMessage(sessionContext, verbatim),
+                new QwenMtClient.Listener() {
             @Override public void onReady() {
                 if (fbGen == mtGeneration.get())
                     debug.log("LAT", "fallback_mt_ttfb_ms=" + (System.nanoTime() - t0) / 1_000_000);
@@ -498,7 +500,8 @@ public class CascadeEngine implements AsrEngine {
         MtRunner.specExecutor().execute(() -> {
             if (gen != mtGeneration.get()) return;  // superseded before we even started
             final long t0 = System.nanoTime();
-            mt.translate(partial, new QwenMtClient.Listener() {
+            mt.translate(MtPromptBuilder.buildUserMessage(sessionContext, partial),
+                    new QwenMtClient.Listener() {
                 @Override public void onReady() {
                     if (gen == mtGeneration.get())
                         debug.log("LAT", "spec_mt_ttfb_ms=" + (System.nanoTime() - t0) / 1_000_000);
