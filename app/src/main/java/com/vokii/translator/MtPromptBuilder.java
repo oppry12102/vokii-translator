@@ -49,13 +49,11 @@ public final class MtPromptBuilder {
      *  generic bilingual one: the LLM auto-detects the spoken language
      *  (Chinese or English) and always emits both labels.
      *
-     *  The {@code ctx} still drives the (semi-static) language-pair + style
-     *  lines in this prompt, but its live "SESSION CONTEXT" section (state
-     *  + recent commands + recent utterances) is NOT appended here — it
-     *  opens the USER message via {@link #buildUserMessage} instead, so this
-     *  system prompt stays byte-static across turns and the qwen-turbo
-     *  implicit context cache can cover the tools schema too (a dynamic tail
-     *  here broke the cache for everything after it, ~2048 tok lost). */
+     *  The {@code ctx} also contributes a "SESSION CONTEXT" section
+     *  (current state + recent commands + recent utterances) that the
+     *  LLM uses to disambiguate voice commands like "改成中文" or
+     *  "再翻一次" without the user having to repeat the slot being
+     *  changed. */
     public static String buildSystemPrompt(SessionContext ctx, ToolRegistry registry) {
         SessionConfig session = ctx.session();
         String src = session.sourceLang();
@@ -191,30 +189,13 @@ public final class MtPromptBuilder {
               .append("it is not a command — translate instead.");
         }
 
-        // NOTE: the live SESSION CONTEXT (current state + recent commands +
-        // recent utterances) is NO LONGER appended here — it now opens the
-        // USER message via buildUserMessage. Keeping this system prompt
-        // byte-static across turns lets the qwen-turbo implicit context
-        // cache cover the tools schema too (a dynamic tail here broke the
-        // cache for everything after it, including tools — ~2048 tok lost).
+        // Append live session context (current state + recent commands +
+        // recent utterances) so the LLM can disambiguate commands like
+        // "改成中文" (change what slot?) or "再翻一次" (re-translate what?)
+        // against prior state.
+        sb.append(ctx.buildPromptSection());
 
         return sb.toString();
-    }
-
-    /** Build the user-message content for an MT turn: the live SESSION
-     *  CONTEXT (current state + recent commands + recent utterances) that
-     *  the LLM uses to disambiguate commands like "改成中文" or "再翻一次",
-     *  followed by the verbatim utterance to translate. The utterance is
-     *  LAST so the model treats it as the turn to respond to; the preceding
-     *  SESSION CONTEXT block is self-describing (it ends with a "use the
-     *  above to disambiguate" line).
-     *  <p>Quality A/B (n=12: plain translation zh/en/code-switch, voice
-     *  commands incl. disambiguation, and anti-cases like "我会说一点日语"):
-     *  12/12 identical translate-vs-command classification vs the old
-     *  system-message placement, so the cache win comes at no behaviour
-     *  change. */
-    public static String buildUserMessage(SessionContext ctx, String verbatim) {
-        return ctx.buildPromptSection() + verbatim;
     }
 
     /** Phase 0 backwards-compat overload. */
