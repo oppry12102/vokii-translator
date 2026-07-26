@@ -24,6 +24,10 @@ public final class Constants {
     public static final String KEY_DISPLAY_MODE = "display_mode";
     /** Serialized transcript history (JSON array of turns). */
     public static final String KEY_TRANSCRIPT = "transcript_history";
+    /** Serialized term→translation glossary (JSON object) for remember_term. */
+    public static final String KEY_GLOSSARY = "glossary";
+    /** Transcript font-scale multiplier (float) for set_font_size. */
+    public static final String KEY_FONT_SCALE = "font_scale";
 
     /** Default sampling temperature. */
     public static final float DEFAULT_TEMPERATURE = 0.3f;
@@ -40,6 +44,10 @@ public final class Constants {
 
     /** Default display mode. Values: "both" | "source_only" | "target_only". */
     public static final String DEFAULT_DISPLAY_MODE = "both";
+
+    /** Default transcript font-scale (1.0 = baseline 16sp). Clamped to
+     *  [0.85, 1.6] by SessionConfig. */
+    public static final float DEFAULT_FONT_SCALE = 1.0f;
 
     /** Whether to use the cascade (fun-asr-realtime → qwen-turbo) pipeline.
      *  Default ON: tier2 MER cuts 0.1436 → 0.0693 (-52% relative to the

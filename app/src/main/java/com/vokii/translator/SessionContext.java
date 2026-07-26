@@ -94,6 +94,17 @@ public final class SessionContext {
         sb.append("===============\n");
         sb.append("Current state:\n");
         appendState(sb);
+        // Known terms glossary (remember_term). Volatile immutable map on
+        // session — safe to read here without the deque lock.
+        java.util.Map<String, String> terms = session.glossary();
+        if (terms != null && !terms.isEmpty()) {
+            sb.append("\nKnown terms (whenever the source contains the left phrase, " +
+                    "the translation MUST use the right phrase verbatim):\n");
+            for (java.util.Map.Entry<String, String> e : terms.entrySet()) {
+                sb.append("  - \"").append(e.getKey()).append("\" → \"")
+                        .append(e.getValue()).append("\"\n");
+            }
+        }
         // Snapshot both deques under the lock so the worker thread iterates
         // stable arrays, not the live deques being mutated on the UI thread.
         CommandHistoryEntry[] cmds;

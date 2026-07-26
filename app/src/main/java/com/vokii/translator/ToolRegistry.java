@@ -63,6 +63,9 @@ public final class ToolRegistry {
                 .register(new BuiltInTools.ExportTranscript())
                 .register(new BuiltInTools.SummarizeSession())
                 .register(new BuiltInTools.RetranslateLast())
-                .register(new BuiltInTools.ListCommands());
+                .register(new BuiltInTools.ListCommands())
+                .register(new BuiltInTools.RememberTerm())
+                .register(new BuiltInTools.ListTerms())
+                .register(new BuiltInTools.SetFontSize());
     }
 }

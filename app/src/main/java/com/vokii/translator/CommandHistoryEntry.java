@@ -68,7 +68,7 @@ public final class CommandHistoryEntry {
         // Order: a small whitelist of common keys first, then anything else.
         StringBuilder sb = new StringBuilder();
         String[] preferred = {"source", "target", "mode", "enabled", "paused",
-                "level", "style", "temperature"};
+                "level", "style", "temperature", "direction", "term", "translation"};
         for (String k : preferred) {
             if (!args.has(k)) continue;
             if (sb.length() > 0) sb.append(", ");

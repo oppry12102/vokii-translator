@@ -61,6 +61,15 @@ final class GroundingCues {
                 "翻", "translate", "again", "redo", "重新", "再来"});
         CUES.put("list_commands", new String[]{
                 "做什么", "命令", "功能", "help", "command", "你能"});
+        CUES.put("remember_term", new String[]{
+                "记住", "简称", "缩写", "以后叫", "以后翻成", "统一叫", "统一翻成",
+                "改一下", "更正", "改成", "记成", "remember", "glossary"});
+        CUES.put("list_terms", new String[]{
+                "术语", "记住了", "记住了哪些", "记住的词", "有哪些词", "记了什么",
+                "list terms", "show terms"});
+        CUES.put("set_font_size", new String[]{
+                "字体", "字号", "字大", "字小", "变大", "变小", "大一点", "小一点",
+                "更大", "更小", "font", "larger", "smaller", "bigger"});
     }
 
     private GroundingCues() {}

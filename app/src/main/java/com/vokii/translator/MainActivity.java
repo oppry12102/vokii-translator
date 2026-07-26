@@ -171,6 +171,8 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         session.setDisplayMode(SessionConfig.DisplayMode.fromKey(config.getDisplayMode()));
         session.setTemperature(config.getTemperature());
         session.setCascadeEnabled(config.isCascadeMode());
+        session.setFontScale(config.getFontScale());
+        session.setGlossary(config.getGlossary());
         // SessionContext wraps the live session state and grows with
         // command history + recent utterances as the session progresses.
         sessionContext = new SessionContext(session);
@@ -343,15 +345,19 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         SessionConfig.DisplayMode newMode = SessionConfig.DisplayMode.fromKey(config.getDisplayMode());
         float newTemp = config.getTemperature();
         boolean newCascade = config.isCascadeMode();
+        float newFont = config.getFontScale();
         boolean changed = !newSrc.equals(session.sourceLang())
                 || !newTgt.equals(session.targetLang())
                 || newMode != session.displayMode()
                 || newTemp != session.temperature()
-                || newCascade != session.cascadeEnabled();
+                || newCascade != session.cascadeEnabled()
+                || newFont != session.fontScale();
         session.setLanguages(newSrc, newTgt);
         session.setDisplayMode(newMode);
         session.setTemperature(newTemp);
         session.setCascadeEnabled(newCascade);
+        session.setFontScale(newFont);
+        session.setGlossary(config.getGlossary());
         if (changed) {
             rebuildAllTurns();
         }
@@ -698,7 +704,8 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             CommandResult primary = applied.results.get(applied.primaryIndex);
             ToolCall primaryCall = calls.get(applied.primaryIndex);
             boolean addsNoteCard = primary.effects.contains(CommandResult.Effect.SUMMARIZE_SESSION)
-                    || primary.effects.contains(CommandResult.Effect.LIST_COMMANDS);
+                    || primary.effects.contains(CommandResult.Effect.LIST_COMMANDS)
+                    || primary.effects.contains(CommandResult.Effect.LIST_TERMS);
             if (addsNoteCard) {
                 history.add(Turn.command(formatChip(primary, primaryCall)));
                 trimHistoryIfNeeded();
@@ -765,6 +772,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                         break;
                     case CLEAR_TRANSCRIPT:
                         doClearTranscript();
+                        break;
+                    case LIST_TERMS:
+                        // The note card was already added above (addsNoteCard
+                        // path) carrying the formatted glossary as the summary.
                         break;
                     default:
                         throw new IllegalStateException("unhandled effect: " + e);
@@ -837,6 +848,8 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             // temperature is persisted across sessions, so restore it too —
             // otherwise a restart would silently revert the undo.
             config.setTemperature(session.temperature());
+            config.setFontScale(session.fontScale());
+            config.setGlossary(session.glossary());
         }
         if (r.prevCascade != null) config.setCascadeMode(r.prevCascade);
         if (r.prevDebug != null) {
@@ -991,6 +1004,9 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         zh.put("summarize_session", "总结对话 —— 例：「总结一下」");
         zh.put("re_translate_last", "重新翻译上一句 —— 例：「重新翻译上一句」");
         zh.put("list_commands", "显示本帮助 —— 例：「你能做什么」");
+        zh.put("remember_term", "记住术语 / 简称 / 改正翻译 —— 例：「记住张三叫 Zhang San」「人工智能简称AI」「改一下张三是 Lao Zhang」");
+        zh.put("list_terms", "查看记住的术语 —— 例：「有哪些术语」「记住了什么」");
+        zh.put("set_font_size", "字体变大 / 变小 —— 例：「字体变大」或「字小一点」");
         StringBuilder sb = new StringBuilder("» 可用命令（直接说出来即可，中英文都行）：\n");
         for (String name : toolRegistry.names()) {
             String line = zh.get(name);
@@ -1092,7 +1108,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
 
     private TextView makeTranscriptLine() {
         TextView tv = new TextView(this);
-        tv.setTextSize(16);
+        tv.setTextSize(16f * session.fontScale());
         tv.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
         tv.setLineSpacing(0f, 1.3f);
         return tv;
@@ -1106,7 +1122,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         if (t.kind == Turn.Kind.COMMAND) {
             TextView note = new TextView(this);
             note.setText(t.commandText);
-            note.setTextSize(14);
+            note.setTextSize(14f * session.fontScale());
             note.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
             note.setLineSpacing(0f, 1.2f);
             return note;

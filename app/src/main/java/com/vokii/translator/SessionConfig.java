@@ -51,6 +51,15 @@ public final class SessionConfig {
     private volatile float temperature = 0.3f;
     /** Mic mute toggle. Session-only — never persisted. */
     private volatile boolean micPaused = false;
+    /** Transcript font-scale multiplier (1.0 = baseline 16sp). Clamped to
+     *  [0.85, 1.6]. Persisted so the user's preferred size survives restarts. */
+    private volatile float fontScale = 1.0f;
+    /** Term→translation glossary built by the remember_term command.
+     *  Immutable map swapped atomically on each mutation. Persisted
+     *  (ConfigStore); injected into the MT prompt by
+     *  {@link SessionContext#buildPromptSection} so names/terms translate
+     *  consistently. Never null. */
+    private volatile java.util.Map<String, String> glossary = java.util.Collections.emptyMap();
 
     public String sourceLang() { return sourceLang; }
     public String targetLang() { return targetLang; }
@@ -100,11 +109,36 @@ public final class SessionConfig {
 
     public void setMicPaused(boolean p) { this.micPaused = p; }
 
+    /** Font-scale, clamped to [0.85, 1.6] (≈13.6sp … 25.6sp on the 16sp base). */
+    public float fontScale() { return fontScale; }
+    public void setFontScale(float s) {
+        if (s < 0.85f) s = 0.85f;
+        if (s > 1.6f) s = 1.6f;
+        this.fontScale = s;
+    }
+
+    /** Glossary (immutable view; never null). */
+    public java.util.Map<String, String> glossary() { return glossary; }
+    /** Replace the glossary with an immutable copy of {@code m}. Null keys,
+     *  empty keys, and null values are dropped. */
+    public void setGlossary(java.util.Map<String, String> m) {
+        java.util.Map<String, String> copy = new java.util.LinkedHashMap<>();
+        if (m != null) {
+            for (java.util.Map.Entry<String, String> e : m.entrySet()) {
+                if (e.getKey() != null && !e.getKey().isEmpty() && e.getValue() != null) {
+                    copy.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        this.glossary = java.util.Collections.unmodifiableMap(copy);
+    }
+
     /** Snapshots all currently-mutable fields for an UNDO restore. Includes
      *  micPaused so toggle_mic is undoable (an earlier version omitted it,
      *  leaving the mic stuck after undoing a pause). */
     public Snapshot snapshot() {
-        return new Snapshot(sourceLang, targetLang, displayMode, stylePrompt, temperature, micPaused);
+        return new Snapshot(sourceLang, targetLang, displayMode, stylePrompt, temperature, micPaused,
+                fontScale, glossary);
     }
 
     /** Restores from a snapshot taken before a tool was applied. */
@@ -116,6 +150,8 @@ public final class SessionConfig {
         this.stylePrompt = s.stylePrompt;
         this.temperature = s.temperature;
         this.micPaused = s.micPaused;
+        this.fontScale = s.fontScale;
+        this.glossary = s.glossary;
     }
 
     /** True iff the display mode is legal for the current language pair —
@@ -134,13 +170,18 @@ public final class SessionConfig {
         public final String stylePrompt;
         public final float temperature;
         public final boolean micPaused;
-        Snapshot(String src, String tgt, DisplayMode dm, String sp, float temp, boolean micPaused) {
+        public final float fontScale;
+        public final java.util.Map<String, String> glossary;
+        Snapshot(String src, String tgt, DisplayMode dm, String sp, float temp, boolean micPaused,
+                 float fontScale, java.util.Map<String, String> glossary) {
             this.sourceLang = src;
             this.targetLang = tgt;
             this.displayMode = dm;
             this.stylePrompt = sp;
             this.temperature = temp;
             this.micPaused = micPaused;
+            this.fontScale = fontScale;
+            this.glossary = glossary;
         }
     }
 }

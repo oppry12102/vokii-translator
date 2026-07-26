@@ -60,7 +60,9 @@ public final class CommandResult {
         /** Refresh the mic status row (toggle_mic changed pause state). */
         MIC_REFRESH,
         /** Change the DebugLogger level (parameter: {@link #logLevelChange}). */
-        LOG_LEVEL
+        LOG_LEVEL,
+        /** Show the remember_term glossary as a note card in the transcript. */
+        LIST_TERMS
     }
 
     /** Short user-visible description, e.g. "Languages → zh↔ja". */

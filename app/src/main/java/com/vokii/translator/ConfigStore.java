@@ -142,6 +142,45 @@ public class ConfigStore {
         prefs.edit().clear().apply();
     }
 
+    /** Term→translation glossary built by the remember_term command. Stored
+     *  as a JSON object string; returns an empty map on missing/invalid. */
+    public java.util.Map<String, String> getGlossary() {
+        String json = prefs.getString(Constants.KEY_GLOSSARY, "{}");
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(json);
+            java.util.Iterator<String> it = o.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                String v = o.optString(k, "");
+                if (!v.isEmpty()) out.put(k, v);
+            }
+        } catch (org.json.JSONException ignored) {
+            // Corrupt or missing → empty glossary.
+        }
+        return out;
+    }
+
+    public void setGlossary(java.util.Map<String, String> glossary) {
+        org.json.JSONObject o = new org.json.JSONObject();
+        if (glossary != null) {
+            for (java.util.Map.Entry<String, String> e : glossary.entrySet()) {
+                try { o.put(e.getKey(), e.getValue() == null ? "" : e.getValue()); }
+                catch (org.json.JSONException ignored) {}
+            }
+        }
+        prefs.edit().putString(Constants.KEY_GLOSSARY, o.toString()).apply();
+    }
+
+    /** Transcript font-scale multiplier. */
+    public float getFontScale() {
+        return prefs.getFloat(Constants.KEY_FONT_SCALE, Constants.DEFAULT_FONT_SCALE);
+    }
+
+    public void setFontScale(float v) {
+        prefs.edit().putFloat(Constants.KEY_FONT_SCALE, v).apply();
+    }
+
     private static String safe(String v, String fallback) {
         return TextUtils.isEmpty(v) ? fallback : v.trim();
     }

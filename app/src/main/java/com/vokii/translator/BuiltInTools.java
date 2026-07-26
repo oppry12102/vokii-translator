@@ -577,6 +577,149 @@ public final class BuiltInTools {
     }
 
     // -----------------------------------------------------------------
+    // 15. list_terms  (view the remember_term glossary)
+    // -----------------------------------------------------------------
+
+    public static final class ListTerms implements VoiceTool {
+        @Override public String name() { return "list_terms"; }
+
+        private static final JSONObject SCHEMA = buildSchema(
+                "list_terms",
+                "Show the user the terms / names they have remembered or corrected " +
+                "so far (the remember_term glossary), as a card in the transcript. " +
+                "Call when the user asks what terms are currently stored.",
+                new ParamDef[]{
+                        new ParamDef("trigger_text", "string",
+                                "The original spoken phrase that triggered this command.", false)
+                }
+        );
+
+        @Override public JSONObject functionSchema() { return SCHEMA; }
+
+        @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
+            // Read-only: format the glossary into the chip text. No snapshot.
+            java.util.Map<String, String> g = session.glossary();
+            if (g == null || g.isEmpty()) {
+                return CommandResult.ok("暂无记住的术语")
+                        .effect(CommandResult.Effect.LIST_TERMS).build();
+            }
+            StringBuilder sb = new StringBuilder("记住的术语：");
+            int n = 0;
+            for (java.util.Map.Entry<String, String> e : g.entrySet()) {
+                sb.append("\n  • ").append(e.getKey()).append(" → ").append(e.getValue());
+                if (++n >= 50) { sb.append("\n  • …"); break; }
+            }
+            return CommandResult.ok(sb.toString())
+                    .effect(CommandResult.Effect.LIST_TERMS).build();
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // 16. remember_term
+    // -----------------------------------------------------------------
+
+    public static final class RememberTerm implements VoiceTool {
+        @Override public String name() { return "remember_term"; }
+
+        private static final JSONObject SCHEMA = buildSchema(
+                "remember_term",
+                "Remember how to translate a specific term, name, or abbreviation " +
+                "so future translations use it consistently. Use it BOTH when the " +
+                "user proactively teaches a term ('记住张三 = Zhang San', " +
+                "'以后把人工智能简称为AI', '统一叫它X') AND when the user explicitly " +
+                "CORRECTS a translation ('改一下，张三是 Lao Zhang 不是 Zhang San', " +
+                "'更正：AI 不是人工智能') — in every case pass the source term and the " +
+                "exact translation to use for it. Persisted across sessions and shown " +
+                "to the model on every subsequent turn. The user can review stored " +
+                "terms via list_terms.",
+                new ParamDef[]{
+                        new ParamDef("term", "string",
+                                "The source phrase exactly as it appears (or would appear) in " +
+                                "the spoken source text, e.g. \"张三\" or \"人工智能\".", true),
+                        new ParamDef("translation", "string",
+                                "The exact rendering to use in the translation whenever the term " +
+                                "occurs, e.g. \"Zhang San\" or \"AI\".", true),
+                        new ParamDef("trigger_text", "string",
+                                "The original spoken phrase that triggered this command.", false)
+                }
+        );
+
+        @Override public JSONObject functionSchema() { return SCHEMA; }
+
+        @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
+            if (args == null) return CommandResult.rejected("缺少参数");
+            String term = Json.optString(args, "term", "").trim();
+            String translation = Json.optString(args, "translation", "").trim();
+            if (term.isEmpty() || translation.isEmpty()) {
+                return CommandResult.rejected("需要同时指定术语和译法");
+            }
+            SessionConfig.Snapshot snap = session.snapshot();
+            java.util.Map<String, String> map = new java.util.LinkedHashMap<>(session.glossary());
+            String prev = map.get(term);
+            map.put(term, translation);
+            session.setGlossary(map);
+            config.setGlossary(map);
+            return CommandResult.ok("已记住：「" + term + "」→「" + translation + "」"
+                            + (prev == null ? "" : "（原：「" + prev + "」）"))
+                    .snapshot(snap)
+                    .build();
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // 17. set_font_size
+    // -----------------------------------------------------------------
+
+    public static final class SetFontSize implements VoiceTool {
+        @Override public String name() { return "set_font_size"; }
+
+        private static final JSONObject SCHEMA = buildSchema(
+                "set_font_size",
+                "Make the transcript text larger or smaller by one step. Repeat to " +
+                "keep scaling; the range is clamped. Takes effect immediately and " +
+                "is persisted across sessions.",
+                new ParamDef[]{
+                        new ParamDef("direction", "string",
+                                "Either \"larger\" or \"smaller\".", true),
+                        new ParamDef("trigger_text", "string",
+                                "The original spoken phrase that triggered this command.", false)
+                }
+        );
+
+        @Override public JSONObject functionSchema() { return SCHEMA; }
+
+        @Override public CommandResult apply(JSONObject args, SessionConfig session, ConfigStore config) {
+            if (args == null) return CommandResult.rejected("缺少参数");
+            String dir = Json.optString(args, "direction", "").trim().toLowerCase(Locale.ROOT);
+            boolean larger;
+            if ("larger".equals(dir) || "big".equals(dir) || "bigger".equals(dir) || "up".equals(dir)) {
+                larger = true;
+            } else if ("smaller".equals(dir) || "small".equals(dir) || "down".equals(dir)) {
+                larger = false;
+            } else {
+                return CommandResult.rejected("direction 必须是 larger 或 smaller");
+            }
+            float prev = session.fontScale();
+            float next = prev * (larger ? 1.15f : (1f / 1.15f));
+            if (next > 1.6f) next = 1.6f;
+            if (next < 0.85f) next = 0.85f;
+            if (next == prev) {
+                // Clamped at the bound — no change, no UNDO entry.
+                return CommandResult.ok("字体已是" + (larger ? "最大" : "最小")).build();
+            }
+            SessionConfig.Snapshot snap = session.snapshot();
+            session.setFontScale(next);
+            config.setFontScale(next);
+            return CommandResult.ok("字体" + (larger ? "变大" : "变小") + " → "
+                            + Math.round(next * 100f) + "%"
+                            + "（原 " + Math.round(prev * 100f) + "%）")
+                    .effect(CommandResult.Effect.RERENDER)
+                    .snapshot(snap)
+                    .build();
+        }
+    }
+
+    // -----------------------------------------------------------------
     // Schema helpers
     // -----------------------------------------------------------------
 
