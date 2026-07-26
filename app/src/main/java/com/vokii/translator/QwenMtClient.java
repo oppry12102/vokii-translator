@@ -93,6 +93,13 @@ public class QwenMtClient {
      */
     public static final String DEFAULT_MODEL = "qwen-turbo";
 
+    /** OpenAI-compatible chat-completions endpoint (DashScope). Hardcoded:
+     *  the cascade MT path always targets qwen-turbo here regardless of the
+     *  ConfigStore model/endpoint (those only steer the joint Qwen-Omni path).
+     *  Shared by {@link #translate} and {@link #warmup}. */
+    private static final String MT_ENDPOINT =
+            "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
+
     /** Fallback prompt used only when the caller does not pass one
      *  explicitly. Kept for tests and ad-hoc invocations; production
      *  always supplies a session-derived prompt from
@@ -166,6 +173,15 @@ public class QwenMtClient {
             .callTimeout(120, TimeUnit.SECONDS)    // hard ceiling per turn
             .build();
 
+    /** Process-wide guard: warmup fires at most once per app lifetime. The
+     *  shared pool stays warm (OkHttp default 5-min keepalive) after the first
+     *  real turn, so re-warming on every stop/start would only add load —
+     *  consistent with SHARED_HTTP living for the app lifetime. Reset to false
+     *  on a warmup failure so a later session can retry. */
+    private static final java.util.concurrent.atomic.AtomicBoolean WARMED =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
+
     public QwenMtClient(String apiKey, String model, DebugLogger debug) {
         this(apiKey, model, DEFAULT_PROMPT, null, 0.3f, debug);
     }
@@ -220,7 +236,7 @@ public class QwenMtClient {
         try {
             JSONObject req = buildRequest(verbatimTranscript);
             Request httpReq = new Request.Builder()
-                    .url("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
+                    .url(MT_ENDPOINT)
                     .addHeader("Authorization", "Bearer " + apiKey)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "text/event-stream")
@@ -335,6 +351,85 @@ public class QwenMtClient {
         req.put("stream", true);
         req.put("temperature", (double) temperature);
         req.put("messages", messages);
+        if (tools != null) {
+            req.put("tools", tools);
+            req.put("tool_choice", "auto");
+        }
+        return req;
+    }
+
+    /** Best-effort, fire-and-forget warmup of the MT HTTP route and the
+     *  qwen-turbo implicit context cache. Sends one {@code max_tokens=1}
+     *  streaming request through {@link #SHARED_HTTP} (the same OkHttpClient
+     *  the real turns use) so the FIRST real turn skips cold TCP+TLS (~200 ms,
+     *  measured as the harness-vs-on-device MT-TTFB gap) and its prefill hits
+     *  an already-primed cache for the static system-prompt + tools prefix.
+     *  Runs async on OkHttp's own dispatcher — never blocks the caller or the
+     *  MT worker. Idempotent process-wide; swallows all errors (a failed
+     *  warmup just means the first turn pays cold start as before).
+     *  <p>Quality-neutral: the dummy request's output is discarded and never
+     *  reaches the UI; it only warms the connection and primes the cache. */
+    public static void warmup(String apiKey, String systemPrompt,
+                              org.json.JSONArray tools, float temperature,
+                              DebugLogger debug) {
+        if (apiKey == null || apiKey.isEmpty()) return;
+        if (WARMED.getAndSet(true)) return;  // already warmed (or warming)
+        final float temp = clampTemp(temperature);
+        final long t0 = System.nanoTime();
+        try {
+            Request httpReq = new Request.Builder()
+                    .url(MT_ENDPOINT)
+                    .addHeader("Authorization", "Bearer " + apiKey)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "text/event-stream")
+                    .post(RequestBody.create(buildWarmupBody(systemPrompt, tools, temp).toString(),
+                            okhttp3.MediaType.parse("application/json; charset=utf-8")))
+                    .build();
+            SHARED_HTTP.newCall(httpReq).enqueue(new okhttp3.Callback() {
+                @Override public void onFailure(Call call, IOException e) {
+                    WARMED.set(false);  // allow a later start() to retry
+                    if (debug != null) debug.log("MT", "warmup failed: " + e.getMessage());
+                }
+                @Override public void onResponse(Call call, Response resp) {
+                    long ms = (System.nanoTime() - t0) / 1_000_000;
+                    // Drain the body fully so the socket returns to the pool
+                    // warm for keep-alive reuse by the next real turn.
+                    try (ResponseBody body = resp.body()) {
+                        if (body != null) body.string();
+                    } catch (Throwable ignored) {}
+                    if (debug != null) {
+                        debug.log("MT", "warmup " + (resp.isSuccessful() ? "ok" : ("HTTP " + resp.code()))
+                                + " ms=" + ms);
+                    }
+                }
+            });
+        } catch (Throwable t) {
+            WARMED.set(false);
+            if (debug != null) debug.log("MT", "warmup init failed: " + t.getMessage());
+        }
+    }
+
+    /** Build the warmup request body: same model / system prompt / tools /
+     *  temperature as a real turn, but a minimal user message and
+     *  {@code max_tokens=1} so output cost is a single token. The prefill
+     *  still runs over the full prompt → primes the context cache for the
+     *  prefix the first real turn will reuse. */
+    private static JSONObject buildWarmupBody(String systemPrompt, org.json.JSONArray tools, float temp)
+            throws org.json.JSONException {
+        JSONObject sysMsg = new JSONObject();
+        sysMsg.put("role", "system");
+        sysMsg.put("content", (systemPrompt == null || systemPrompt.isEmpty())
+                ? DEFAULT_PROMPT : systemPrompt);
+        JSONObject userMsg = new JSONObject();
+        userMsg.put("role", "user");
+        userMsg.put("content", ".");   // discarded; max_tokens=1 ends generation at once
+        JSONArray messages = new JSONArray().put(sysMsg).put(userMsg);
+        JSONObject req = new JSONObject();
+        req.put("model", DEFAULT_MODEL);
+        req.put("stream", true);
+        req.put("temperature", (double) temp);
+        req.put("messages", messages);
+        req.put("max_tokens", 1);
         if (tools != null) {
             req.put("tools", tools);
             req.put("tool_choice", "auto");

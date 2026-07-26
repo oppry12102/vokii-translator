@@ -192,6 +192,15 @@ public class CascadeEngine implements AsrEngine {
         }
 
         started = true;
+        // Warm the MT HTTP route + qwen-turbo context cache BEFORE the first
+        // real turn, so it skips cold TCP+TLS (~200 ms) and hits a primed
+        // cache. Fire-and-forget on OkHttp's dispatcher; idempotent app-wide
+        // (only the first start() actually hits the network). Quality-neutral:
+        // the dummy 1-token response is discarded, never reaches the UI.
+        QwenMtClient.warmup(config.getApiKey(),
+                MtPromptBuilder.buildSystemPrompt(sessionContext, toolRegistry),
+                MtPromptBuilder.buildToolsJson(toolRegistry),
+                session.temperature(), debug);
         // Capture this session's identity + callback snapshot. The anonymous
         // listener below bails on every callback if sid != sessionSeq, so a
         // stale frame from the PREVIOUS session's closing WebSocket (which
