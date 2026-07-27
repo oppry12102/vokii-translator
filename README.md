@@ -36,7 +36,10 @@ whereas a joint speech-and-translate model (Qwen-Omni Realtime) splits
 its attention budget across both tasks. fun-asr beats the joint model on
 verbatim error rate while also being smaller and faster. Step 2 then
 delegates translation to a general-purpose LLM via the OpenAI-compatible
-chat endpoint, paying an extra ~0.7 s TTFB per committed sentence.
+chat endpoint, paying an extra ~0.7 s TTFB per committed sentence. Step 2
+opens with a one-token warmup request at session start, so the first real
+MT call skips the cold TCP+TLS handshake and hits a primed qwen-turbo
+context cache (~0.3 s off the first sentence, quality-neutral).
 
 A toggle in Settings switches back to the **joint** Qwen-Omni Realtime
 path if needed (e.g. regions without fun-asr-realtime coverage).
@@ -129,6 +132,10 @@ translation. Examples (Chinese or English both work):
 | 总结一下 | `summarize_session` |
 | 重新翻译上一句 | `re_translate_last` |
 | 你能做什么？ / help | `list_commands` |
+| 记住张三叫 Zhang San / 人工智能简称AI | `remember_term` (记住专有名词，持久化) |
+| 改一下张三叫 Lao Zhang / 更正… | `remember_term` (同一清单，语音改错) |
+| 有哪些术语 / what did you remember | `list_terms` |
+| 字体变大 / 字小一点 | `set_font_size` |
 
 State-changing commands carry a snapshot so the most recent one is
 undoable — tap the status line under the transcript (the same line that
@@ -137,6 +144,12 @@ current state + recent commands + recent utterances back into the
 prompt so follow-ups like "改成中文" (change to *what*?) can be
 disambiguated. Destructive commands (`clear_transcript`) are not
 undoable.
+
+`remember_term` builds a persistent glossary (SharedPreferences, loaded
+on startup) that is injected into the MT prompt's session context, so
+names and terms translate consistently on every subsequent turn — it also
+absorbs explicit voice corrections ("改一下…", "更正…"). Query the list
+any time with `list_terms` ("有哪些术语").
 
 A debug-only inject panel (hidden in release builds) lets you exercise
 the full tool chain by typing a phrase instead of speaking.
@@ -176,9 +189,9 @@ working default — anyone who decompiles it can recover the key. That's
 the trade-off for "fresh install just works". Override at runtime in
 Settings; the override takes precedence over the bundled default.
 
-The release keystore lives at `keystore/vokii-release.jks` and is
-checked into this repo (a real release process would not do this; see
-[Security notes](#security-notes)).
+The release keystore lives at `keystore/vokii-release.jks` (gitignored)
+with its passwords in `local.properties` — it is NOT committed. See
+[Security notes](#security-notes).
 
 ## Eval
 
@@ -215,7 +228,6 @@ See `tools/eval/README.md` for the full driver list and
 .
 ├── app/                         # Android Studio project (Java)
 │   ├── build.gradle             #   BuildConfig fields from local.properties
-│   ├── keystore/vokii-release.jks
 │   └── src/main/java/com/vokii/translator/
 │       ├── MainActivity.java    #   mic button, per-turn transcript cards, status hint + dot
 │       ├── SettingsActivity.java
@@ -229,7 +241,7 @@ See `tools/eval/README.md` for the full driver list and
 │       ├── QwenOmniRealtimeClient.java
 │       ├── MtRunner.java        #   shared MT executor + client factory
 │       ├── Turn.java / TurnParser.java  #  bilingual ZH/EN (any pair) parse
-│       ├── BuiltInTools.java    #   the 13 voice tools
+│       ├── BuiltInTools.java    #   the 16 voice tools
 │       ├── ToolRegistry.java / ToolDispatcher.java
 │       ├── ToolCall.java / ToolCallAccumulator.java
 │       ├── CommandResult.java   #   EnumSet<Effect> + Builder
@@ -253,7 +265,7 @@ See `tools/eval/README.md` for the full driver list and
 │   ├── build_manifest.py
 │   ├── select_tiers.py
 │   └── REPORT.*.md              #   empirical write-ups
-├── keystore/                    # (duplicate; app uses ../keystore/vokii-release.jks)
+├── keystore/                    # vokii-release.jks (gitignored, rotated 2026-07-26)
 ├── build.gradle                 # project-level (AGP)
 └── local.properties             # (gitignored) QWEN_API_KEY
 ```
@@ -265,20 +277,19 @@ See `tools/eval/README.md` for the full driver list and
   build is configured to compile it in for "fresh install just works".
   If you distribute the APK publicly, treat the bundled key as leaked
   and rotate it.
-- The release keystore (`keystore/vokii-release.jks`) is committed for
-  reproducibility. A real release process would store it in CI secrets
-  and rotate it per release.
-- `app/agconnect-services.json` is gitignored — the AGC debug/release
-  SHA-256 fingerprints let anyone with the key push crash/analytics to
-  the same AGC project.
+- The release keystore (`keystore/vokii-release.jks`) is gitignored — it
+  used to be committed, which burned the app's signing identity. It was
+  removed from git history and the key rotated 2026-07-26 (current cert
+  SHA-256 `37:9E:2A:…`). Generate/sign locally; a real release process
+  would store it in CI secrets.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md). Latest tagged: **v2.3.0** — voice-control
-subsystem + hardening pass (concurrency/leak fixes, fun-asr −52 % MER
-reclaimed). The `v2-cascade` branch on top adds, unreleased: live ASR
-caption + speculative MT + qwen-turbo (latency P0/P1/P5) and the
-transcript reading-experience rework above.
+See [CHANGELOG.md](CHANGELOG.md). Latest tagged: **v2.5.0** — three new
+voice commands (`remember_term` incl. voice corrections, `list_terms`,
+`set_font_size`) and the MT connection warmup (~0.3 s off the first MT
+turn). The former `v2-cascade` development branch is merged into `main`,
+which is now the mainline.
 
 ## License
 
