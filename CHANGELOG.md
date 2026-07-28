@@ -4,6 +4,20 @@ All notable changes to Vokii are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres loosely to [Semantic Versioning](https://semver.org/).
 
+## [v2.5.1] — 2026-07-28
+
+### Eval
+- **Full CS-Dialogue transcription** (n=6,186, all 30 speakers, 18.3 h):
+  fun-asr-realtime avg MER 0.112 / median 0.020; 46.1% perfect, 0 errors.
+  Report: `tools/eval/REPORT.cs_dialogue.full.md`.
+- `cascade_step1.py` / `cascade_step1_alt.py`: added `--workers N` for
+  parallel ASR eval (8 workers → 6,186 samples in ~55 min).
+
+### Docs
+- README: voice-command examples switched from zh↔ja to zh↔fr.
+- README: Voice Commands table reformatted to 3 columns (Chinese command,
+  English command, tool fired).
+
 ## [v2.5.0] — 2026-07-26
 
 ### Added — voice commands (13 → 16)
