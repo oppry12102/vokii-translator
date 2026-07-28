@@ -105,6 +105,11 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     /** False while the card shows only the live ASR caption; true once MT
      *  (final or speculative) has streamed for this sentence. */
     private boolean activeHasMt;
+    /** True while a deferred ASR-partial render is already queued on the UI
+     *  handler. ASR partials fire at ~20 ms — when this flag is set incoming
+     *  partials update {@link #activeVerbatim} but skip posting a duplicate
+     *  render, so at most one text-set runs per message-queue cycle. */
+    private boolean renderPending;
 
     // ----- target-line typewriter (see feedTranslation) -----
     private TextView typeView;
@@ -559,11 +564,27 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
                 + " change=" + (activeVerbatim.isEmpty() ? "new"
                         : (text.startsWith(activeVerbatim) ? "extend" : "REWRITE")));
         activeVerbatim = text;
-        decideVerbatimColumnOnce(null);
-        attachActiveCard();
-        refreshActiveCardText();
-        maybeChase();
+        // Coalesce: ASR partials arrive at ~20 ms but a single setText is
+        // enough per message-queue cycle. Defer the render so multiple
+        // incoming partials collapse into one UI update. During command
+        // processing this also keeps the verbatim buffer up to date while
+        // skipping the per-partial measure/setText/maybeChase work on the
+        // (congested) UI thread.
+        if (!renderPending) {
+            renderPending = true;
+            uiHandler.post(renderPartial);
+        }
     }
+
+    private final Runnable renderPartial = new Runnable() {
+        @Override public void run() {
+            renderPending = false;
+            decideVerbatimColumnOnce(null);
+            attachActiveCard();
+            refreshActiveCardText();
+            maybeChase();
+        }
+    };
 
     @Override public void onFinalTranscript(String text) {
         if (text == null || text.isEmpty()) return;
@@ -686,15 +707,30 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
     @Override public void onCommand(java.util.List<ToolCall> calls) {
         if (calls == null || calls.isEmpty()) return;
         debug.log("CMD", "received " + calls.size() + " call(s)");
-        ToolDispatcher.Applied applied = toolDispatcher.apply(calls, session, config);
-        for (int i = 0; i < applied.results.size(); i++) {
-            CommandResult r = applied.results.get(i);
-            if (r.rejected) {
-                debug.log("CMD", "  reject: " + r.rejectReason);
-            } else {
-                debug.log("CMD", "  " + calls.get(i).name + " -> " + r.summary);
+        // Dispatch tool logic off the UI thread:
+        //   toolDispatcher.apply() mutates session (fields are volatile → safe)
+        //   and config (SharedPreferences → thread-safe), but runs on the MT
+        //   executor so the typewriter, ASR partials, and chase scroller keep
+        //   running uninterrupted. Only View updates post back to main.
+        final java.util.List<ToolCall> captured = calls;
+        MtRunner.executor().execute(() -> {
+            ToolDispatcher.Applied applied = toolDispatcher.apply(captured, session, config);
+            for (int i = 0; i < applied.results.size(); i++) {
+                CommandResult r = applied.results.get(i);
+                if (r.rejected) {
+                    debug.log("CMD", "  reject: " + r.rejectReason);
+                } else {
+                    debug.log("CMD", "  " + captured.get(i).name + " -> " + r.summary);
+                }
             }
-        }
+            uiHandler.post(() -> applyCommandResult(captured, applied));
+        });
+    }
+
+    /** Apply the already-computed {@link ToolDispatcher.Applied} result to the
+     *  UI. Called on the main thread from every {@link #onCommand} path. */
+    private void applyCommandResult(java.util.List<ToolCall> calls,
+                                     ToolDispatcher.Applied applied) {
         // Settings-style results go to the one-line status hint under the
         // transcript (kept short: summary only, no "heard:" echo) so the
         // transcript itself stays pure conversation. Only long-form results
@@ -742,7 +778,10 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
             for (CommandResult.Effect e : primary.effects) {
                 switch (e) {
                     case RERENDER:
-                        rebuildAllTurns();
+                        // Light refresh: text didn't change, only
+                        // display mode / font scale — update views
+                        // in place instead of destroying + recreating.
+                        refreshAllTurnViews();
                         break;
                     case ENGINE_RECONCILE:
                         reconcileEngineIfNeeded();
@@ -1164,6 +1203,57 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         if (hadActive) {
             attachActiveCard();       // verbatim/translate state is preserved
             refreshActiveCardText();  // in the fields, so typing resumes
+            ensureTypeTicking();
+        }
+        maybeChase();
+    }
+
+    /** Lightweight in-place refresh of every committed turn card's visibility
+     *  and font size — NO view destruction or creation. Used for voice-command
+     *  RERENDER (set_languages, set_display, set_font_size) where only the
+     *  display mode or font-scale changed, not the text content.
+     *
+     *  <p>Falls back to {@link #rebuildAllTurns()} when the number of committed
+     *  cards doesn't match {@code history.size()} (shouldn't happen, but a
+     *  mismatch means the invariant is broken and we need a full rebuild). */
+    private void refreshAllTurnViews() {
+        SessionConfig.DisplayMode mode = session.displayMode();
+        float fs = session.fontScale();
+        int committedCount = activeCard != null
+                ? turnsContainer.getChildCount() - 1
+                : turnsContainer.getChildCount();
+        if (committedCount != history.size()) {
+            rebuildAllTurns();   // invariant broken — safe fallback
+            return;
+        }
+        for (int i = 0; i < history.size(); i++) {
+            Turn t = history.get(i);
+            View child = turnsContainer.getChildAt(i);
+            if (t.kind == Turn.Kind.COMMAND) {
+                if (child instanceof TextView) {
+                    TextView note = (TextView) child;
+                    note.setTextSize(14f * fs);
+                }
+            } else {
+                // TRANSLATION turn: card is a vertical LinearLayout with
+                // child 0 = source line, child 1 = target line.
+                if (child instanceof LinearLayout) {
+                    LinearLayout card = (LinearLayout) child;
+                    if (card.getChildCount() >= 2) {
+                        TextView src = (TextView) card.getChildAt(0);
+                        TextView tgt = (TextView) card.getChildAt(1);
+                        src.setVisibility(mode != SessionConfig.DisplayMode.TARGET_ONLY
+                                && !t.source.isEmpty() ? View.VISIBLE : View.GONE);
+                        tgt.setVisibility(mode != SessionConfig.DisplayMode.SOURCE_ONLY
+                                && !t.target.isEmpty() ? View.VISIBLE : View.GONE);
+                        src.setTextSize(16f * fs);
+                        tgt.setTextSize(16f * fs);
+                    }
+                }
+            }
+        }
+        if (activeCard != null) {
+            refreshActiveCardText();   // verbatim/translate state preserved
             ensureTypeTicking();
         }
         maybeChase();
