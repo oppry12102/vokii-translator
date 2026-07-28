@@ -300,10 +300,10 @@ See `tools/eval/README.md` for the full driver list and
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md). Latest tagged: **v2.5.0** — three new
-voice commands (`remember_term` incl. voice corrections, `list_terms`,
-`set_font_size`) and the MT connection warmup (~0.3 s off the first MT
-turn). The former `v2-cascade` development branch is merged into `main`,
+See [CHANGELOG.md](CHANGELOG.md). Latest tagged: **v2.5.1** — full
+CS-Dialogue transcription eval (n=6,186), README zh→fr + 3-column
+voice-command table, and the parallel `--workers` eval harness.
+The former `v2-cascade` development branch is merged into `main`,
 which is now the mainline.
 
 ## License
