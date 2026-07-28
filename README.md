@@ -2,7 +2,7 @@
 
 Android voice translator: speak in Chinese or English, see the other
 language live as you talk. You can also speak control commands ("下面
-改成中日翻译", "暂停", "总结一下") and they fire as LLM tool calls —
+改成中法翻译", "暂停", "总结一下") and they fire as LLM tool calls —
 see [Voice commands](#voice-commands). Cloud-only — no on-device speech
 model, no GMS/HMS dependency.
 
@@ -97,7 +97,7 @@ The transcript is built for reading while listening, not just logging:
 - **Glide scrolling**: a frame-paced chase scroller eases the window to
   the bottom (~270 dp/s cap) instead of jumping. Scroll up to read back
   and follow mode disengages until you return to the bottom.
-- **Status line**: voice-command confirmations ("» Languages → zh↔ja")
+- **Status line**: voice-command confirmations ("» Languages → zh↔fr")
   show on a one-line hint under the transcript — tap it to undo. The
   transcript itself stays pure conversation (session summaries and the
   commands catalog still appear in-line as note cards).
@@ -129,26 +129,28 @@ catalog; when the user says something that's a control intent rather
 than a phrase to translate, it emits `tool_calls` instead of a
 translation. Examples (Chinese or English both work):
 
-| Say | Tool fired |
-|-----|------------|
-| 下面改成中日翻译 / translate to Japanese | `set_translation_languages` (auto-flips direction) |
-| 只显示日文就好 / show English only | `set_display_mode` |
-| 翻译得更文雅一些 | `set_translation_mode` (style) |
-| 温度调到 0.7 | `set_translation_mode` (temperature) |
-| 暂停 / pause | `toggle_mic` (engine stays warm, capture skips) |
-| 切换到普通模式 / switch to joint | `toggle_cascade` (next mic tap) |
-| 打开调试 / open debug | `toggle_debug` |
-| 把日志设成详细模式 | `set_log_level` |
-| 现在是什么设置？ | `get_current_settings` |
-| 清空翻译 | `clear_transcript` |
-| 复制到剪贴板 | `export_transcript` |
-| 总结一下 | `summarize_session` |
-| 重新翻译上一句 | `re_translate_last` |
-| 你能做什么？ / help | `list_commands` |
-| 记住张三叫 Zhang San / 人工智能简称AI | `remember_term` (记住专有名词，持久化) |
-| 改一下张三叫 Lao Zhang / 更正… | `remember_term` (同一清单，语音改错) |
-| 有哪些术语 / what did you remember | `list_terms` |
-| 字体变大 / 字小一点 | `set_font_size` |
+| Chinese command | English command | Tool fired |
+|-----------------|-----------------|------------|
+| 下面改成中法翻译 | translate to French | `set_translation_languages` (auto-flips direction) |
+| 只显示法文就好 | show French only | `set_display_mode` |
+| 翻译得更文雅一些 | — | `set_translation_mode` (style) |
+| 温度调到 0.7 | — | `set_translation_mode` (temperature) |
+| 暂停 | pause | `toggle_mic` (engine stays warm, capture skips) |
+| 切换到普通模式 | switch to joint | `toggle_cascade` (next mic tap) |
+| 打开调试 | open debug | `toggle_debug` |
+| 把日志设成详细模式 | — | `set_log_level` |
+| 现在是什么设置？ | — | `get_current_settings` |
+| 清空翻译 | — | `clear_transcript` |
+| 复制到剪贴板 | — | `export_transcript` |
+| 总结一下 | — | `summarize_session` |
+| 重新翻译上一句 | — | `re_translate_last` |
+| 你能做什么？ | help | `list_commands` |
+| 记住张三叫 Zhang San | — | `remember_term` (持久化专有名词) |
+| 人工智能简称AI | — | `remember_term` |
+| 改一下张三叫 Lao Zhang | — | `remember_term` (同一清单，语音改错) |
+| 有哪些术语 | what did you remember | `list_terms` |
+| 字体变大 | — | `set_font_size` |
+| 字小一点 | — | `set_font_size` |
 
 State-changing commands carry a snapshot so the most recent one is
 undoable — tap the status line under the transcript (the same line that
