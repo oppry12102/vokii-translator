@@ -1,6 +1,7 @@
 package com.vokii.translator;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
@@ -104,6 +105,7 @@ public class QwenOmniEngine implements AsrEngine {
         });
     }
 
+    @SuppressLint("MissingPermission")
     private void startCapture() {
         int minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);

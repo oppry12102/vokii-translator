@@ -1,6 +1,7 @@
 package com.vokii.translator;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
@@ -578,6 +579,7 @@ public class CascadeEngine implements AsrEngine {
         cb.onError(-6, message);
     }
 
+    @SuppressLint("MissingPermission")
     private void startCapture() {
         // DEBUG-only test hook: if a raw PCM file (16 kHz mono s16le) was
         // pushed to the app's external files dir, stream it to the ASR at

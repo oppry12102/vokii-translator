@@ -83,7 +83,7 @@ android {
     // once the findings are resolved.
     lint {
         checkReleaseBuilds true
-        abortOnError false
+        abortOnError true
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
