@@ -22,6 +22,7 @@ import os
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
@@ -259,25 +260,53 @@ def run(args: argparse.Namespace) -> int:
     print(f"Loaded {len(items)} item(s) from {manifest}", file=sys.stderr)
 
     per_sample: List[dict] = []
-    for i, item in enumerate(items, 1):
+
+    def _process_one(item: dict) -> dict:
         sid = item["id"]
         ref = (item.get("ref") or item.get("ref_transcript") or "").strip()
         audio_path = Path(item["audio"])
-        print(f"[{i}/{len(items)}] {sid} ... ", end="", flush=True)
         try:
             pcm = load_wav_as_pcm16_mono(str(audio_path))
         except Exception as e:
-            print(f"audio load failed: {e}")
-            per_sample.append({"id": sid, "error": f"audio load: {e}"})
-            continue
+            return {"id": sid, "error": f"audio load: {e}"}
         result = transcribe_one(pcm, args.model, sid, timeout_s=args.timeout)
         s = score(result, ref)
-        per_sample.append(s)
-        if result.error:
-            print(f"err={result.error[:50]}")
-        else:
-            print(f"MER={s.get('mer'):.3f} ({len(result.transcript)} chars)  "
-                  f"[{result.elapsed_s:.1f}s]")
+        return s
+
+    n_workers = max(1, args.workers)
+    if n_workers == 1:
+        for i, item in enumerate(items, 1):
+            sid = item["id"]
+            print(f"[{i}/{len(items)}] {sid} ... ", end="", flush=True)
+            s = _process_one(item)
+            per_sample.append(s)
+            if s.get("error"):
+                print(f"err={s['error'][:50]}")
+            else:
+                print(f"MER={s.get('mer'):.3f} ({len(s.get('hyp', ''))} chars)  "
+                      f"[{s.get('elapsed_s', 0):.1f}s]")
+    else:
+        print(f"Running with {n_workers} parallel workers on {len(items)} samples...", flush=True)
+        # Submit all, collect in original order via index mapping.
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            futures = {pool.submit(_process_one, item): i
+                      for i, item in enumerate(items)}
+            results: List[Optional[dict]] = [None] * len(items)
+            done_count = 0
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    s = future.result()
+                except Exception as e:
+                    s = {"id": items[idx]["id"], "error": f"worker: {e}"}
+                results[idx] = s
+                done_count += 1
+                sid = s.get("id", "?")
+                if done_count % 50 == 0 or done_count == len(items):
+                    mer_str = f"MER={s.get('mer'):.3f}" if s.get('mer') is not None else "MER=—"
+                    err_str = f"  err={s.get('error', '')[:40]}" if s.get('error') else ""
+                    print(f"  [{done_count}/{len(items)}] {sid}  {mer_str}{err_str}", flush=True)
+            per_sample = [r for r in results if r is not None]
 
     sample_metrics = [
         {k: v for k, v in s.items()
@@ -322,6 +351,9 @@ def main() -> int:
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--timeout", type=float, default=30.0,
                    help="per-sample receive timeout (sec)")
+    p.add_argument("--workers", type=int, default=1,
+                   help="number of parallel workers (1 = sequential; "
+                        "8-16 recommended for large manifests)")
     p.add_argument("--report", default="report.cascade.step1.json")
     args = p.parse_args()
     return run(args)

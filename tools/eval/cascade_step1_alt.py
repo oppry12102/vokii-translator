@@ -52,6 +52,8 @@ def main() -> int:
                         "sensevoice-realtime-v1, paraformer-realtime-v1")
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--timeout", type=float, default=30.0)
+    p.add_argument("--workers", type=int, default=1,
+                   help="number of parallel workers (1 = sequential)")
     p.add_argument("--report", default="report.cascade.step1.alt.json")
     args = p.parse_args()
     return run(args)

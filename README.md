@@ -54,6 +54,18 @@ On CS-Dialogue tier2 (n=240, code-switch zh+en conversation):
 | cascade1 (paraformer-realtime-v2 step 1) | 0.0869 | **−39 %** |
 | **cascade + fun-asr-realtime step 1** | **0.0693** | **−52 %** |
 
+On the **full CS-Dialogue dev set** (n=6,186, all 30 speakers, 18.3 h audio):
+
+| Metric | Value |
+|--------|-------|
+| **MER** mean / median | **0.112** / **0.020** |
+| CER (Chinese char) | 0.098 (n=4,443) |
+| WER (English word) | 0.169 (n=2,904) |
+| Perfect (MER = 0) | 46.1 % |
+| MER ≤ 0.1 | 76.1 % |
+| MER ≤ 0.2 | 87.2 % |
+| Errors / empty outputs | 0 / 0 |
+
 And on tier1 (n=30, real-time pacing):
 
 | | joint | cascade2 | speedup |
@@ -64,8 +76,9 @@ And on tier1 (n=30, real-time pacing):
 
 Cascade is a **no-trade-off win** — both more accurate AND faster on
 every metric that matters to the user. See
+`tools/eval/REPORT.cs_dialogue.full.md` for the full-dataset breakdown,
 `tools/eval/REPORT.latency.tier1.cascade2.md` and
-`tools/eval/REPORT.cascade.step3.md` for the full breakdown.
+`tools/eval/REPORT.cascade.step3.md` for the latency and step-3 reports.
 
 ## Reading experience
 
