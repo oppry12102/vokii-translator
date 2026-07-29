@@ -143,8 +143,15 @@ public class CascadeEngine implements AsrEngine {
      *  one per {@link #SPEC_MIN_INTERVAL_NS}. */
     private volatile long lastSpecNanos;
     /** Minimum partial length before a speculative MT is worth firing —
-     *  shorter partials are too incomplete to translate meaningfully. */
-    private static final int SPEC_MIN_CHARS = 6;
+     *  shorter partials are too incomplete to translate meaningfully.
+     *  Device latency re-measure (2026-07-29): with 6 the gate itself was
+     *  the dominant first-draft cost (~0.73 s of the ~1.0 s from first
+     *  partial to first draft visible; spec TTFB only ~0.24 s). Lowered
+     *  6 → 3: "下面进" is enough context for a stable draft head, and the
+     *  adoption gate (never-shrink + common-prefix) absorbs the extra
+     *  early-draft revisions. Do NOT go to 2 — two-char drafts are
+     *  meaningless and just get re-speced. */
+    private static final int SPEC_MIN_CHARS = 3;
     /** Minimum gap between speculative fires. The spec MT itself takes
      *  ~0.5 s TTFB, so firing faster than this just wastes calls. */
     private static final long SPEC_MIN_INTERVAL_NS = 700_000_000L;
