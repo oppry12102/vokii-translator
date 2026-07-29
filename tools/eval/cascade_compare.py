@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from statistics import mean, median
@@ -109,16 +110,18 @@ def name_of(report: dict, path: Path) -> str:
     bits = []
     if cfg.get("model"):
         m = cfg["model"]
-        # Order matters: the omni-plus and omni-flash model ids both contain
-        # "omni" and the flash id contains "flash", so "plus" must be tested
-        # before "flash". The old ladder tested "flash" first, which labelled
-        # every omni-flash model plain "flash" and made the trailing
-        # "qwen-omni-flash" branch unreachable — so a Plus-vs-Flash A/B showed
-        # two identical "flash" columns.
-        bits.append(("qwen-omni-plus" if "plus" in m else
+        # Order matters: test the most specific ids first. "qwen3-asr-flash"
+        # contains "flash" but is NOT an omni model; the omni-plus/omni-flash
+        # ids both contain "omni" and the flash id contains "flash", so
+        # "plus" precedes "flash". Dated fun-asr snapshots keep their date so
+        # an undated-vs-dated A/B doesn't show two identical columns.
+        date = re.search(r"20\d{2}-\d{2}-\d{2}", m)
+        suffix = ("@" + date.group(0)) if date else ""
+        bits.append(("qwen3-asr" + suffix if "qwen3-asr" in m else
+                     "qwen-omni-plus" if "plus" in m else
                      "qwen-omni-flash" if "flash" in m else
                      "paraformer" if "paraformer" in m else
-                     "fun-asr" if "fun" in m else
+                     "fun-asr" + suffix if "fun" in m else
                      m))
     if cfg.get("instructions"):
         bits.append("instr=" + cfg["instructions"])
