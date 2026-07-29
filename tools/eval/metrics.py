@@ -156,6 +156,69 @@ def mixed_error_rate(ref: str, hyp: str, normalize: bool = True) -> MixedErrorSt
 
 
 # ---------------------------------------------------------------------
+# Filler / backchannel equivalence (SECONDARY diagnostic metric)
+# ---------------------------------------------------------------------
+#
+# ASR models often write a Chinese backchannel in Latin orthography
+# ("嗯哼" -> "uh-huh.", "哦" -> "Oh.") or vice versa. The acoustics were
+# recognized correctly — only the written language differs — but raw MER
+# scores it as a full error (1.0 on a 1-token reference). On the
+# CS-Dialogue full set (n=6186) this class is ~15% of mean MER.
+#
+# filler_equiv_mer() maps both ref and hyp to shared canonical tokens
+# before scoring. It is a SECONDARY metric: raw MER stays the headline,
+# and CER_zh/WER_en are always computed raw (canonical ack* tokens would
+# pollute the per-language split, so this function returns MER only).
+
+_FILLER_BIGRAM = {
+    # zh bigrams collapse first (嗯哼 is two zh tokens)
+    ("嗯", "哼"): "ackmhm", ("嗯", "嗯"): "ackm", ("啊", "啊"): "ackah",
+    ("哦", "哦"): "ackoh", ("呃", "呃"): "ackuh", ("哎", "哎"): "ackai",
+    # en bigrams ("uh huh" tokenizes as two words; "uh-huh" as one)
+    ("uh", "huh"): "ackmhm", ("uh", "uh"): "ackuh", ("oh", "oh"): "ackoh",
+}
+
+_FILLER_EQUIV = {
+    # zh unigrams (post-normalization, so already simplified)
+    "嗯": "ackm", "呃": "ackuh", "哦": "ackoh", "啊": "ackah",
+    "诶": "ackeh", "哎": "ackai", "噢": "ackoh", "嗐": "ackai", "哼": "ackmhm",
+    # en unigrams (apostrophes/hyphens already stripped by normalize_asr)
+    "uhhuh": "ackmhm", "mhm": "ackmhm", "mmhmm": "ackmhm",
+    "um": "ackm", "hmm": "ackm", "hm": "ackm", "mm": "ackm", "mmm": "ackm",
+    "uh": "ackuh", "erm": "ackuh", "huh": "ackuh",
+    "oh": "ackoh", "ah": "ackah", "eh": "ackeh",
+}
+
+
+def map_filler_tokens(tokens: List[str]) -> List[str]:
+    """Map filler/backchannel tokens (zh and en written forms) to shared
+    canonical tokens. Bigrams collapse before unigrams."""
+    out: List[str] = []
+    i = 0
+    while i < len(tokens):
+        if i + 1 < len(tokens):
+            canon = _FILLER_BIGRAM.get((tokens[i], tokens[i + 1]))
+            if canon is not None:
+                out.append(canon)
+                i += 2
+                continue
+        out.append(_FILLER_EQUIV.get(tokens[i], tokens[i]))
+        i += 1
+    return out
+
+
+def filler_equiv_mer(ref: str, hyp: str, normalize: bool = True) -> float:
+    """MER with backchannel/filler cross-language equivalence applied to
+    BOTH ref and hyp. Secondary diagnostic — raw ``mer`` stays the
+    headline metric; see the section note above."""
+    r_text = normalize_asr(ref) if normalize else ref
+    h_text = normalize_asr(hyp) if normalize else hyp
+    r = map_filler_tokens(tokenize_mixed(r_text))
+    h = map_filler_tokens(tokenize_mixed(h_text))
+    return edit_distance(r, h) / len(r) if r else float(len(h))
+
+
+# ---------------------------------------------------------------------
 # Latency
 # ---------------------------------------------------------------------
 

@@ -25,6 +25,7 @@ restricted to the Chinese / English tokens.
 | Metric | What it tells you |
 |--------|-------------------|
 | `mer` | Mixed error rate (transcribe task) — 0 is perfect |
+| `mer_fe` | **Secondary**: MER with backchannel/filler cross-language equivalence (嗯哼=uh-huh, 哦=oh, 啊=ah, …) applied to both sides. ~15% of full-set mean MER is this written-form noise; raw `mer` stays the headline |
 | `cer_zh` | Chinese character error rate |
 | `wer_en` | English word error rate |
 | `bleu_zh` / `bleu_en` | Translation BLEU-4 (translate task only) |
@@ -39,6 +40,15 @@ punctuation/symbols → lowercase Latin → collapse spaces**. The 繁→简 ste
 needs `opencc-python-reimplemented` (optional, falls back to identity if
 missing) — Pro model will sometimes emit 繁體, which would otherwise
 inflate CER_zh.
+
+`mer_fe` (`filler_equiv_mer` in metrics.py) additionally maps filler /
+backchannel tokens to shared canonical forms on BOTH ref and hyp before
+the same edit-distance — e.g. a hyp of "uh-huh." against a ref of "嗯哼。"
+scores 0 (the acoustics were right; only the written language differed).
+Dropped fillers still count as deletions; zh↔zh confusions (哦 vs 啊) still
+count. Reports carry it as per-sample `mer_fe` + `avg_mer_fe` summary; new
+runs emit it automatically, old reports can be backfilled with
+`rescore_fillereq.py --manifest <m> <report...>` (offline, in place).
 
 ## Setup
 

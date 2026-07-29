@@ -15,7 +15,8 @@
       "mer": 0.07692307692307693,
       "cer_zh": null,
       "wer_en": 0.07692307692307693,
-      "n_ref_tokens": 13
+      "n_ref_tokens": 13,
+      "mer_fe": 0.07692307692307693
     },
     {
       "id": "ZH-CN_U0024_S0_357",
@@ -27,7 +28,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 5
+      "n_ref_tokens": 5,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0025_S0_182",
@@ -39,7 +41,8 @@
       "mer": 0.053763440860215055,
       "cer_zh": 0.0449438202247191,
       "wer_en": 0.25,
-      "n_ref_tokens": 93
+      "n_ref_tokens": 93,
+      "mer_fe": 0.053763440860215055
     },
     {
       "id": "ZH-CN_U0026_S0_101",
@@ -51,7 +54,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 10
+      "n_ref_tokens": 10,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0035_S0_66",
@@ -63,7 +67,8 @@
       "mer": 0.08396946564885496,
       "cer_zh": 0.0873015873015873,
       "wer_en": 0.0,
-      "n_ref_tokens": 131
+      "n_ref_tokens": 131,
+      "mer_fe": 0.08396946564885496
     },
     {
       "id": "ZH-CN_U0036_S0_189",
@@ -75,7 +80,8 @@
       "mer": 0.19047619047619047,
       "cer_zh": 0.21428571428571427,
       "wer_en": 0.2857142857142857,
-      "n_ref_tokens": 21
+      "n_ref_tokens": 21,
+      "mer_fe": 0.09523809523809523
     },
     {
       "id": "ZH-CN_U0049_S0_64",
@@ -87,7 +93,8 @@
       "mer": 0.02857142857142857,
       "cer_zh": null,
       "wer_en": 0.02857142857142857,
-      "n_ref_tokens": 70
+      "n_ref_tokens": 70,
+      "mer_fe": 0.02857142857142857
     },
     {
       "id": "ZH-CN_U0050_S0_119",
@@ -99,7 +106,8 @@
       "mer": 0.034482758620689655,
       "cer_zh": 0.03508771929824561,
       "wer_en": 0.0,
-      "n_ref_tokens": 58
+      "n_ref_tokens": 58,
+      "mer_fe": 0.034482758620689655
     },
     {
       "id": "ZH-CN_U0059_S0_459",
@@ -111,7 +119,8 @@
       "mer": 0.17647058823529413,
       "cer_zh": null,
       "wer_en": 0.17647058823529413,
-      "n_ref_tokens": 17
+      "n_ref_tokens": 17,
+      "mer_fe": 0.17647058823529413
     },
     {
       "id": "ZH-CN_U0060_S0_432",
@@ -123,7 +132,8 @@
       "mer": 0.07692307692307693,
       "cer_zh": null,
       "wer_en": 0.07692307692307693,
-      "n_ref_tokens": 13
+      "n_ref_tokens": 13,
+      "mer_fe": 0.07692307692307693
     },
     {
       "id": "ZH-CN_U0061_S0_530",
@@ -135,7 +145,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 11
+      "n_ref_tokens": 11,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0062_S0_715",
@@ -147,7 +158,8 @@
       "mer": 0.05263157894736842,
       "cer_zh": null,
       "wer_en": 0.05263157894736842,
-      "n_ref_tokens": 19
+      "n_ref_tokens": 19,
+      "mer_fe": 0.05263157894736842
     },
     {
       "id": "ZH-CN_U0063_S0_562",
@@ -159,7 +171,8 @@
       "mer": 0.13793103448275862,
       "cer_zh": null,
       "wer_en": 0.13793103448275862,
-      "n_ref_tokens": 29
+      "n_ref_tokens": 29,
+      "mer_fe": 0.13793103448275862
     },
     {
       "id": "ZH-CN_U0064_S0_456",
@@ -171,7 +184,8 @@
       "mer": 0.06,
       "cer_zh": null,
       "wer_en": 0.06,
-      "n_ref_tokens": 50
+      "n_ref_tokens": 50,
+      "mer_fe": 0.06
     },
     {
       "id": "ZH-CN_U0081_S0_223",
@@ -183,7 +197,8 @@
       "mer": 0.1044776119402985,
       "cer_zh": 0.11320754716981132,
       "wer_en": 0.14285714285714285,
-      "n_ref_tokens": 67
+      "n_ref_tokens": 67,
+      "mer_fe": 0.1044776119402985
     },
     {
       "id": "ZH-CN_U0082_S0_189",
@@ -195,7 +210,8 @@
       "mer": 0.044444444444444446,
       "cer_zh": 0.0,
       "wer_en": 0.1111111111111111,
-      "n_ref_tokens": 45
+      "n_ref_tokens": 45,
+      "mer_fe": 0.044444444444444446
     },
     {
       "id": "ZH-CN_U1003_S0_141",
@@ -207,7 +223,8 @@
       "mer": 0.07142857142857142,
       "cer_zh": 0.06306306306306306,
       "wer_en": 0.26666666666666666,
-      "n_ref_tokens": 126
+      "n_ref_tokens": 126,
+      "mer_fe": 0.06349206349206349
     },
     {
       "id": "ZH-CN_U1004_S0_288",
@@ -219,7 +236,8 @@
       "mer": 0.07317073170731707,
       "cer_zh": null,
       "wer_en": 0.07317073170731707,
-      "n_ref_tokens": 82
+      "n_ref_tokens": 82,
+      "mer_fe": 0.07317073170731707
     },
     {
       "id": "ZH-CN_U1007_S0_160",
@@ -231,7 +249,8 @@
       "mer": 0.01818181818181818,
       "cer_zh": 0.020833333333333332,
       "wer_en": 0.0,
-      "n_ref_tokens": 55
+      "n_ref_tokens": 55,
+      "mer_fe": 0.01818181818181818
     },
     {
       "id": "ZH-CN_U1008_S0_9",
@@ -243,7 +262,8 @@
       "mer": 0.25,
       "cer_zh": null,
       "wer_en": 0.25,
-      "n_ref_tokens": 4
+      "n_ref_tokens": 4,
+      "mer_fe": 0.25
     },
     {
       "id": "ZH-CN_U1021_S0_20",
@@ -255,7 +275,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 2
+      "n_ref_tokens": 2,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1022_S0_143",
@@ -267,7 +288,8 @@
       "mer": 0.2,
       "cer_zh": null,
       "wer_en": 0.2,
-      "n_ref_tokens": 20
+      "n_ref_tokens": 20,
+      "mer_fe": 0.2
     },
     {
       "id": "ZH-CN_U1031_S0_211",
@@ -279,7 +301,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 1
+      "n_ref_tokens": 1,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1032_S0_85",
@@ -291,7 +314,8 @@
       "mer": 0.08333333333333333,
       "cer_zh": null,
       "wer_en": 0.08333333333333333,
-      "n_ref_tokens": 36
+      "n_ref_tokens": 36,
+      "mer_fe": 0.08333333333333333
     },
     {
       "id": "ZH-CN_U1053_S0_123",
@@ -303,7 +327,8 @@
       "mer": 0.3333333333333333,
       "cer_zh": null,
       "wer_en": 0.3333333333333333,
-      "n_ref_tokens": 3
+      "n_ref_tokens": 3,
+      "mer_fe": 0.3333333333333333
     },
     {
       "id": "ZH-CN_U1054_S0_145",
@@ -315,7 +340,8 @@
       "mer": 0.14814814814814814,
       "cer_zh": null,
       "wer_en": 0.14814814814814814,
-      "n_ref_tokens": 27
+      "n_ref_tokens": 27,
+      "mer_fe": 0.14814814814814814
     },
     {
       "id": "ZH-CN_U1103_S0_267",
@@ -327,7 +353,8 @@
       "mer": 0.1956521739130435,
       "cer_zh": null,
       "wer_en": 0.15217391304347827,
-      "n_ref_tokens": 46
+      "n_ref_tokens": 46,
+      "mer_fe": 0.1956521739130435
     },
     {
       "id": "ZH-CN_U1104_S0_41",
@@ -339,7 +366,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 4
+      "n_ref_tokens": 4,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2003_S0_272",
@@ -351,7 +379,8 @@
       "mer": 0.024390243902439025,
       "cer_zh": 0.02702702702702703,
       "wer_en": 0.0,
-      "n_ref_tokens": 41
+      "n_ref_tokens": 41,
+      "mer_fe": 0.024390243902439025
     },
     {
       "id": "ZH-CN_U2004_S0_280",
@@ -363,7 +392,8 @@
       "mer": 0.08695652173913043,
       "cer_zh": 0.047619047619047616,
       "wer_en": 0.5,
-      "n_ref_tokens": 23
+      "n_ref_tokens": 23,
+      "mer_fe": 0.08695652173913043
     },
     {
       "id": "ZH-CN_U0023_S0_223",
@@ -375,7 +405,8 @@
       "mer": 0.043478260869565216,
       "cer_zh": 0.08333333333333333,
       "wer_en": 0.0,
-      "n_ref_tokens": 23
+      "n_ref_tokens": 23,
+      "mer_fe": 0.043478260869565216
     },
     {
       "id": "ZH-CN_U0024_S0_794",
@@ -387,7 +418,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 6
+      "n_ref_tokens": 6,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0025_S0_250",
@@ -399,7 +431,8 @@
       "mer": 0.06666666666666667,
       "cer_zh": 0.0,
       "wer_en": 1.0,
-      "n_ref_tokens": 30
+      "n_ref_tokens": 30,
+      "mer_fe": 0.06666666666666667
     },
     {
       "id": "ZH-CN_U0026_S0_405",
@@ -411,7 +444,8 @@
       "mer": 0.11827956989247312,
       "cer_zh": null,
       "wer_en": 0.11827956989247312,
-      "n_ref_tokens": 93
+      "n_ref_tokens": 93,
+      "mer_fe": 0.11827956989247312
     },
     {
       "id": "ZH-CN_U0035_S0_404",
@@ -423,7 +457,8 @@
       "mer": 0.05309734513274336,
       "cer_zh": null,
       "wer_en": 0.05309734513274336,
-      "n_ref_tokens": 113
+      "n_ref_tokens": 113,
+      "mer_fe": 0.05309734513274336
     },
     {
       "id": "ZH-CN_U0036_S0_413",
@@ -435,7 +470,8 @@
       "mer": 0.09375,
       "cer_zh": 0.0,
       "wer_en": 0.375,
-      "n_ref_tokens": 32
+      "n_ref_tokens": 32,
+      "mer_fe": 0.09375
     },
     {
       "id": "ZH-CN_U0049_S0_36",
@@ -447,7 +483,8 @@
       "mer": 0.3,
       "cer_zh": 0.5,
       "wer_en": 0.0,
-      "n_ref_tokens": 10
+      "n_ref_tokens": 10,
+      "mer_fe": 0.3
     },
     {
       "id": "ZH-CN_U0050_S0_42",
@@ -459,7 +496,8 @@
       "mer": 0.1694915254237288,
       "cer_zh": null,
       "wer_en": 0.1694915254237288,
-      "n_ref_tokens": 59
+      "n_ref_tokens": 59,
+      "mer_fe": 0.1694915254237288
     },
     {
       "id": "ZH-CN_U0059_S0_51",
@@ -471,7 +509,8 @@
       "mer": 0.017543859649122806,
       "cer_zh": 0.023255813953488372,
       "wer_en": 0.0,
-      "n_ref_tokens": 57
+      "n_ref_tokens": 57,
+      "mer_fe": 0.017543859649122806
     },
     {
       "id": "ZH-CN_U0060_S0_230",
@@ -483,7 +522,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 2
+      "n_ref_tokens": 2,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0061_S0_562",
@@ -495,7 +535,8 @@
       "mer": 0.08695652173913043,
       "cer_zh": null,
       "wer_en": 0.08695652173913043,
-      "n_ref_tokens": 23
+      "n_ref_tokens": 23,
+      "mer_fe": 0.08695652173913043
     },
     {
       "id": "ZH-CN_U0062_S0_671",
@@ -507,7 +548,8 @@
       "mer": 0.018691588785046728,
       "cer_zh": 0.010416666666666666,
       "wer_en": 0.09090909090909091,
-      "n_ref_tokens": 107
+      "n_ref_tokens": 107,
+      "mer_fe": 0.018691588785046728
     },
     {
       "id": "ZH-CN_U0063_S0_385",
@@ -519,7 +561,8 @@
       "mer": 0.08695652173913043,
       "cer_zh": 0.023809523809523808,
       "wer_en": 0.75,
-      "n_ref_tokens": 46
+      "n_ref_tokens": 46,
+      "mer_fe": 0.08695652173913043
     },
     {
       "id": "ZH-CN_U0064_S0_578",
@@ -531,7 +574,8 @@
       "mer": 0.058823529411764705,
       "cer_zh": 0.0625,
       "wer_en": 0.0,
-      "n_ref_tokens": 34
+      "n_ref_tokens": 34,
+      "mer_fe": 0.058823529411764705
     },
     {
       "id": "ZH-CN_U0081_S0_165",
@@ -543,7 +587,8 @@
       "mer": 0.0625,
       "cer_zh": null,
       "wer_en": 0.0625,
-      "n_ref_tokens": 16
+      "n_ref_tokens": 16,
+      "mer_fe": 0.0625
     },
     {
       "id": "ZH-CN_U0082_S0_121",
@@ -555,7 +600,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 16
+      "n_ref_tokens": 16,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1003_S0_20",
@@ -567,7 +613,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1004_S0_82",
@@ -579,7 +626,8 @@
       "mer": 0.10526315789473684,
       "cer_zh": null,
       "wer_en": 0.10526315789473684,
-      "n_ref_tokens": 19
+      "n_ref_tokens": 19,
+      "mer_fe": 0.10526315789473684
     },
     {
       "id": "ZH-CN_U1007_S0_92",
@@ -591,7 +639,8 @@
       "mer": 0.13043478260869565,
       "cer_zh": 0.15,
       "wer_en": 0.0,
-      "n_ref_tokens": 23
+      "n_ref_tokens": 23,
+      "mer_fe": 0.13043478260869565
     },
     {
       "id": "ZH-CN_U1008_S0_2",
@@ -603,7 +652,8 @@
       "mer": 0.25,
       "cer_zh": null,
       "wer_en": 0.25,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.25
     },
     {
       "id": "ZH-CN_U1021_S0_26",
@@ -615,7 +665,8 @@
       "mer": 0.20833333333333334,
       "cer_zh": null,
       "wer_en": 0.20833333333333334,
-      "n_ref_tokens": 24
+      "n_ref_tokens": 24,
+      "mer_fe": 0.20833333333333334
     },
     {
       "id": "ZH-CN_U1022_S0_136",
@@ -627,7 +678,8 @@
       "mer": 0.3,
       "cer_zh": null,
       "wer_en": 0.3,
-      "n_ref_tokens": 20
+      "n_ref_tokens": 20,
+      "mer_fe": 0.3
     },
     {
       "id": "ZH-CN_U1031_S0_24",
@@ -639,7 +691,8 @@
       "mer": 0.14285714285714285,
       "cer_zh": null,
       "wer_en": 0.14285714285714285,
-      "n_ref_tokens": 28
+      "n_ref_tokens": 28,
+      "mer_fe": 0.14285714285714285
     },
     {
       "id": "ZH-CN_U1032_S0_40",
@@ -651,7 +704,8 @@
       "mer": 0.06493506493506493,
       "cer_zh": 0.05555555555555555,
       "wer_en": 0.2,
-      "n_ref_tokens": 77
+      "n_ref_tokens": 77,
+      "mer_fe": 0.06493506493506493
     },
     {
       "id": "ZH-CN_U1053_S0_72",
@@ -663,7 +717,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 14
+      "n_ref_tokens": 14,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1054_S0_56",
@@ -675,7 +730,8 @@
       "mer": 0.07317073170731707,
       "cer_zh": 0.07692307692307693,
       "wer_en": 0.0,
-      "n_ref_tokens": 41
+      "n_ref_tokens": 41,
+      "mer_fe": 0.07317073170731707
     },
     {
       "id": "ZH-CN_U1103_S0_47",
@@ -687,7 +743,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 10
+      "n_ref_tokens": 10,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1104_S0_144",
@@ -699,7 +756,8 @@
       "mer": 0.12380952380952381,
       "cer_zh": 0.11224489795918367,
       "wer_en": 0.2857142857142857,
-      "n_ref_tokens": 105
+      "n_ref_tokens": 105,
+      "mer_fe": 0.12380952380952381
     },
     {
       "id": "ZH-CN_U2003_S0_266",
@@ -711,7 +769,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 10
+      "n_ref_tokens": 10,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2004_S0_154",
@@ -723,7 +782,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 47
+      "n_ref_tokens": 47,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0023_S0_479",
@@ -735,7 +795,8 @@
       "mer": 0.024390243902439025,
       "cer_zh": 0.0,
       "wer_en": 0.041666666666666664,
-      "n_ref_tokens": 41
+      "n_ref_tokens": 41,
+      "mer_fe": 0.024390243902439025
     },
     {
       "id": "ZH-CN_U0024_S0_435",
@@ -747,7 +808,8 @@
       "mer": 0.038461538461538464,
       "cer_zh": 0.043478260869565216,
       "wer_en": 0.16666666666666666,
-      "n_ref_tokens": 52
+      "n_ref_tokens": 52,
+      "mer_fe": 0.038461538461538464
     },
     {
       "id": "ZH-CN_U0025_S0_108",
@@ -759,7 +821,8 @@
       "mer": 0.14285714285714285,
       "cer_zh": null,
       "wer_en": 0.14285714285714285,
-      "n_ref_tokens": 21
+      "n_ref_tokens": 21,
+      "mer_fe": 0.14285714285714285
     },
     {
       "id": "ZH-CN_U0026_S0_274",
@@ -771,7 +834,8 @@
       "mer": 1.0,
       "cer_zh": null,
       "wer_en": 1.0,
-      "n_ref_tokens": 2
+      "n_ref_tokens": 2,
+      "mer_fe": 1.0
     },
     {
       "id": "ZH-CN_U0035_S0_88",
@@ -783,7 +847,8 @@
       "mer": 0.25,
       "cer_zh": null,
       "wer_en": 0.25,
-      "n_ref_tokens": 4
+      "n_ref_tokens": 4,
+      "mer_fe": 0.25
     },
     {
       "id": "ZH-CN_U0036_S0_91",
@@ -795,7 +860,8 @@
       "mer": 0.14285714285714285,
       "cer_zh": null,
       "wer_en": 0.14285714285714285,
-      "n_ref_tokens": 7
+      "n_ref_tokens": 7,
+      "mer_fe": 0.14285714285714285
     },
     {
       "id": "ZH-CN_U0049_S0_43",
@@ -807,7 +873,8 @@
       "mer": 0.08571428571428572,
       "cer_zh": 0.09090909090909091,
       "wer_en": 0.07142857142857142,
-      "n_ref_tokens": 105
+      "n_ref_tokens": 105,
+      "mer_fe": 0.08571428571428572
     },
     {
       "id": "ZH-CN_U0050_S0_123",
@@ -819,7 +886,8 @@
       "mer": 0.032,
       "cer_zh": 0.019230769230769232,
       "wer_en": 0.09523809523809523,
-      "n_ref_tokens": 125
+      "n_ref_tokens": 125,
+      "mer_fe": 0.032
     },
     {
       "id": "ZH-CN_U0059_S0_199",
@@ -831,7 +899,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 38
+      "n_ref_tokens": 38,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0060_S0_93",
@@ -843,7 +912,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 13
+      "n_ref_tokens": 13,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0061_S0_174",
@@ -855,7 +925,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 7
+      "n_ref_tokens": 7,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0062_S0_604",
@@ -867,7 +938,8 @@
       "mer": 0.009523809523809525,
       "cer_zh": 0.010309278350515464,
       "wer_en": 0.125,
-      "n_ref_tokens": 105
+      "n_ref_tokens": 105,
+      "mer_fe": 0.009523809523809525
     },
     {
       "id": "ZH-CN_U0063_S0_81",
@@ -879,7 +951,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 59
+      "n_ref_tokens": 59,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0064_S0_604",
@@ -891,7 +964,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 4
+      "n_ref_tokens": 4,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0081_S0_2",
@@ -903,7 +977,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 3
+      "n_ref_tokens": 3,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0082_S0_207",
@@ -915,7 +990,8 @@
       "mer": 0.09090909090909091,
       "cer_zh": 0.1,
       "wer_en": 0.23076923076923078,
-      "n_ref_tokens": 33
+      "n_ref_tokens": 33,
+      "mer_fe": 0.09090909090909091
     },
     {
       "id": "ZH-CN_U1003_S0_143",
@@ -927,7 +1003,8 @@
       "mer": 0.038834951456310676,
       "cer_zh": 0.05063291139240506,
       "wer_en": 0.0,
-      "n_ref_tokens": 103
+      "n_ref_tokens": 103,
+      "mer_fe": 0.038834951456310676
     },
     {
       "id": "ZH-CN_U1004_S0_3",
@@ -939,7 +1016,8 @@
       "mer": 0.0425531914893617,
       "cer_zh": null,
       "wer_en": 0.0425531914893617,
-      "n_ref_tokens": 47
+      "n_ref_tokens": 47,
+      "mer_fe": 0.0425531914893617
     },
     {
       "id": "ZH-CN_U1007_S0_236",
@@ -951,7 +1029,8 @@
       "mer": 0.16129032258064516,
       "cer_zh": 1.0,
       "wer_en": 0.14285714285714285,
-      "n_ref_tokens": 31
+      "n_ref_tokens": 31,
+      "mer_fe": 0.16129032258064516
     },
     {
       "id": "ZH-CN_U1008_S0_201",
@@ -963,7 +1042,8 @@
       "mer": 0.1,
       "cer_zh": null,
       "wer_en": 0.1,
-      "n_ref_tokens": 10
+      "n_ref_tokens": 10,
+      "mer_fe": 0.1
     },
     {
       "id": "ZH-CN_U1021_S0_40",
@@ -975,7 +1055,8 @@
       "mer": 0.09090909090909091,
       "cer_zh": null,
       "wer_en": 0.09090909090909091,
-      "n_ref_tokens": 33
+      "n_ref_tokens": 33,
+      "mer_fe": 0.09090909090909091
     },
     {
       "id": "ZH-CN_U1022_S0_66",
@@ -987,7 +1068,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 28
+      "n_ref_tokens": 28,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1031_S0_1",
@@ -999,7 +1081,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 8
+      "n_ref_tokens": 8,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1032_S0_34",
@@ -1011,7 +1094,8 @@
       "mer": 0.1111111111111111,
       "cer_zh": null,
       "wer_en": 0.1111111111111111,
-      "n_ref_tokens": 45
+      "n_ref_tokens": 45,
+      "mer_fe": 0.1111111111111111
     },
     {
       "id": "ZH-CN_U1053_S0_19",
@@ -1023,7 +1107,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 3
+      "n_ref_tokens": 3,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1054_S0_148",
@@ -1035,7 +1120,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 13
+      "n_ref_tokens": 13,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1103_S0_255",
@@ -1047,7 +1133,8 @@
       "mer": 0.36363636363636365,
       "cer_zh": null,
       "wer_en": 0.36363636363636365,
-      "n_ref_tokens": 11
+      "n_ref_tokens": 11,
+      "mer_fe": 0.36363636363636365
     },
     {
       "id": "ZH-CN_U1104_S0_114",
@@ -1059,7 +1146,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 3
+      "n_ref_tokens": 3,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2003_S0_280",
@@ -1071,7 +1159,8 @@
       "mer": 0.031578947368421054,
       "cer_zh": 0.0410958904109589,
       "wer_en": 0.045454545454545456,
-      "n_ref_tokens": 95
+      "n_ref_tokens": 95,
+      "mer_fe": 0.031578947368421054
     },
     {
       "id": "ZH-CN_U2004_S0_298",
@@ -1083,7 +1172,8 @@
       "mer": 0.10714285714285714,
       "cer_zh": 0.0967741935483871,
       "wer_en": 0.12,
-      "n_ref_tokens": 56
+      "n_ref_tokens": 56,
+      "mer_fe": 0.10714285714285714
     },
     {
       "id": "ZH-CN_U0023_S0_130",
@@ -1095,7 +1185,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 15
+      "n_ref_tokens": 15,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0024_S0_450",
@@ -1107,7 +1198,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 45
+      "n_ref_tokens": 45,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0025_S0_92",
@@ -1119,7 +1211,8 @@
       "mer": 0.05128205128205128,
       "cer_zh": 0.05405405405405406,
       "wer_en": 0.0,
-      "n_ref_tokens": 39
+      "n_ref_tokens": 39,
+      "mer_fe": 0.05128205128205128
     },
     {
       "id": "ZH-CN_U0026_S0_242",
@@ -1131,7 +1224,8 @@
       "mer": 0.05188679245283019,
       "cer_zh": 0.052132701421800945,
       "wer_en": 0.0,
-      "n_ref_tokens": 212
+      "n_ref_tokens": 212,
+      "mer_fe": 0.05188679245283019
     },
     {
       "id": "ZH-CN_U0035_S0_179",
@@ -1143,7 +1237,8 @@
       "mer": 0.12389380530973451,
       "cer_zh": 0.13725490196078433,
       "wer_en": 0.0,
-      "n_ref_tokens": 113
+      "n_ref_tokens": 113,
+      "mer_fe": 0.11504424778761062
     },
     {
       "id": "ZH-CN_U0036_S0_202",
@@ -1155,7 +1250,8 @@
       "mer": 0.1724137931034483,
       "cer_zh": null,
       "wer_en": 0.1724137931034483,
-      "n_ref_tokens": 58
+      "n_ref_tokens": 58,
+      "mer_fe": 0.1724137931034483
     },
     {
       "id": "ZH-CN_U0049_S0_46",
@@ -1167,7 +1263,8 @@
       "mer": 0.23529411764705882,
       "cer_zh": null,
       "wer_en": 0.23529411764705882,
-      "n_ref_tokens": 34
+      "n_ref_tokens": 34,
+      "mer_fe": 0.20588235294117646
     },
     {
       "id": "ZH-CN_U0050_S0_178",
@@ -1179,7 +1276,8 @@
       "mer": 0.06666666666666667,
       "cer_zh": null,
       "wer_en": 0.06666666666666667,
-      "n_ref_tokens": 15
+      "n_ref_tokens": 15,
+      "mer_fe": 0.06666666666666667
     },
     {
       "id": "ZH-CN_U0059_S0_286",
@@ -1191,7 +1289,8 @@
       "mer": 0.05027932960893855,
       "cer_zh": 0.02857142857142857,
       "wer_en": 1.0,
-      "n_ref_tokens": 179
+      "n_ref_tokens": 179,
+      "mer_fe": 0.05027932960893855
     },
     {
       "id": "ZH-CN_U0060_S0_276",
@@ -1203,7 +1302,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": 0.0,
-      "n_ref_tokens": 34
+      "n_ref_tokens": 34,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0061_S0_540",
@@ -1215,7 +1315,8 @@
       "mer": 0.1,
       "cer_zh": null,
       "wer_en": 0.1,
-      "n_ref_tokens": 20
+      "n_ref_tokens": 20,
+      "mer_fe": 0.1
     },
     {
       "id": "ZH-CN_U0062_S0_355",
@@ -1227,7 +1328,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 5
+      "n_ref_tokens": 5,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0063_S0_118",
@@ -1239,7 +1341,8 @@
       "mer": 0.21052631578947367,
       "cer_zh": null,
       "wer_en": 0.21052631578947367,
-      "n_ref_tokens": 19
+      "n_ref_tokens": 19,
+      "mer_fe": 0.21052631578947367
     },
     {
       "id": "ZH-CN_U0064_S0_283",
@@ -1251,7 +1354,8 @@
       "mer": 0.034482758620689655,
       "cer_zh": null,
       "wer_en": 0.034482758620689655,
-      "n_ref_tokens": 29
+      "n_ref_tokens": 29,
+      "mer_fe": 0.034482758620689655
     },
     {
       "id": "ZH-CN_U0081_S0_85",
@@ -1263,7 +1367,8 @@
       "mer": 0.5,
       "cer_zh": null,
       "wer_en": 0.5,
-      "n_ref_tokens": 2
+      "n_ref_tokens": 2,
+      "mer_fe": 0.5
     },
     {
       "id": "ZH-CN_U0082_S0_105",
@@ -1275,7 +1380,8 @@
       "mer": 0.12903225806451613,
       "cer_zh": null,
       "wer_en": 0.12903225806451613,
-      "n_ref_tokens": 31
+      "n_ref_tokens": 31,
+      "mer_fe": 0.12903225806451613
     },
     {
       "id": "ZH-CN_U1003_S0_195",
@@ -1287,7 +1393,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 3
+      "n_ref_tokens": 3,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1004_S0_11",
@@ -1299,7 +1406,8 @@
       "mer": 0.11538461538461539,
       "cer_zh": null,
       "wer_en": 0.11538461538461539,
-      "n_ref_tokens": 52
+      "n_ref_tokens": 52,
+      "mer_fe": 0.11538461538461539
     },
     {
       "id": "ZH-CN_U1007_S0_86",
@@ -1311,7 +1419,8 @@
       "mer": 0.0625,
       "cer_zh": null,
       "wer_en": 0.0625,
-      "n_ref_tokens": 32
+      "n_ref_tokens": 32,
+      "mer_fe": 0.0625
     },
     {
       "id": "ZH-CN_U1008_S0_114",
@@ -1323,7 +1432,8 @@
       "mer": 0.07142857142857142,
       "cer_zh": 0.07692307692307693,
       "wer_en": 0.25,
-      "n_ref_tokens": 56
+      "n_ref_tokens": 56,
+      "mer_fe": 0.07142857142857142
     },
     {
       "id": "ZH-CN_U1021_S0_159",
@@ -1335,7 +1445,8 @@
       "mer": 0.16666666666666666,
       "cer_zh": null,
       "wer_en": 0.16666666666666666,
-      "n_ref_tokens": 18
+      "n_ref_tokens": 18,
+      "mer_fe": 0.16666666666666666
     },
     {
       "id": "ZH-CN_U1022_S0_145",
@@ -1347,7 +1458,8 @@
       "mer": 0.1111111111111111,
       "cer_zh": null,
       "wer_en": 0.1111111111111111,
-      "n_ref_tokens": 18
+      "n_ref_tokens": 18,
+      "mer_fe": 0.1111111111111111
     },
     {
       "id": "ZH-CN_U1031_S0_33",
@@ -1359,7 +1471,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 17
+      "n_ref_tokens": 17,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1032_S0_90",
@@ -1371,7 +1484,8 @@
       "mer": 0.08333333333333333,
       "cer_zh": null,
       "wer_en": 0.08333333333333333,
-      "n_ref_tokens": 48
+      "n_ref_tokens": 48,
+      "mer_fe": 0.08333333333333333
     },
     {
       "id": "ZH-CN_U1053_S0_10",
@@ -1383,7 +1497,8 @@
       "mer": 0.5714285714285714,
       "cer_zh": 1.0,
       "wer_en": 0.6666666666666666,
-      "n_ref_tokens": 7
+      "n_ref_tokens": 7,
+      "mer_fe": 0.5714285714285714
     },
     {
       "id": "ZH-CN_U1054_S0_151",
@@ -1395,7 +1510,8 @@
       "mer": 0.09523809523809523,
       "cer_zh": null,
       "wer_en": 0.09523809523809523,
-      "n_ref_tokens": 42
+      "n_ref_tokens": 42,
+      "mer_fe": 0.09523809523809523
     },
     {
       "id": "ZH-CN_U1103_S0_308",
@@ -1407,7 +1523,8 @@
       "mer": 0.08,
       "cer_zh": 0.08333333333333333,
       "wer_en": 1.0,
-      "n_ref_tokens": 25
+      "n_ref_tokens": 25,
+      "mer_fe": 0.08
     },
     {
       "id": "ZH-CN_U1104_S0_245",
@@ -1419,7 +1536,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 3
+      "n_ref_tokens": 3,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2003_S0_304",
@@ -1431,7 +1549,8 @@
       "mer": 0.13636363636363635,
       "cer_zh": null,
       "wer_en": 0.13636363636363635,
-      "n_ref_tokens": 22
+      "n_ref_tokens": 22,
+      "mer_fe": 0.13636363636363635
     },
     {
       "id": "ZH-CN_U2004_S0_183",
@@ -1443,7 +1562,8 @@
       "mer": 0.0,
       "cer_zh": null,
       "wer_en": 0.0,
-      "n_ref_tokens": 11
+      "n_ref_tokens": 11,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0023_S0_296",
@@ -1455,7 +1575,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 20
+      "n_ref_tokens": 20,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0024_S0_2",
@@ -1467,7 +1588,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0025_S0_4",
@@ -1479,7 +1601,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0026_S0_316",
@@ -1491,7 +1614,8 @@
       "mer": 0.022988505747126436,
       "cer_zh": 0.022988505747126436,
       "wer_en": null,
-      "n_ref_tokens": 87
+      "n_ref_tokens": 87,
+      "mer_fe": 0.022988505747126436
     },
     {
       "id": "ZH-CN_U0035_S0_8",
@@ -1503,7 +1627,8 @@
       "mer": 0.09090909090909091,
       "cer_zh": 0.09090909090909091,
       "wer_en": null,
-      "n_ref_tokens": 11
+      "n_ref_tokens": 11,
+      "mer_fe": 0.09090909090909091
     },
     {
       "id": "ZH-CN_U0036_S0_6",
@@ -1515,7 +1640,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 35
+      "n_ref_tokens": 35,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0049_S0_67",
@@ -1527,7 +1653,8 @@
       "mer": 0.03773584905660377,
       "cer_zh": 0.03773584905660377,
       "wer_en": null,
-      "n_ref_tokens": 106
+      "n_ref_tokens": 106,
+      "mer_fe": 0.03773584905660377
     },
     {
       "id": "ZH-CN_U0050_S0_8",
@@ -1539,7 +1666,8 @@
       "mer": 0.05555555555555555,
       "cer_zh": 0.05555555555555555,
       "wer_en": null,
-      "n_ref_tokens": 126
+      "n_ref_tokens": 126,
+      "mer_fe": 0.05555555555555555
     },
     {
       "id": "ZH-CN_U0059_S0_124",
@@ -1551,7 +1679,8 @@
       "mer": 0.0392156862745098,
       "cer_zh": 0.0392156862745098,
       "wer_en": null,
-      "n_ref_tokens": 51
+      "n_ref_tokens": 51,
+      "mer_fe": 0.0392156862745098
     },
     {
       "id": "ZH-CN_U0060_S0_359",
@@ -1563,7 +1692,8 @@
       "mer": 0.05384615384615385,
       "cer_zh": 0.05384615384615385,
       "wer_en": null,
-      "n_ref_tokens": 130
+      "n_ref_tokens": 130,
+      "mer_fe": 0.05384615384615385
     },
     {
       "id": "ZH-CN_U0061_S0_199",
@@ -1575,7 +1705,8 @@
       "mer": 0.08108108108108109,
       "cer_zh": 0.08108108108108109,
       "wer_en": null,
-      "n_ref_tokens": 37
+      "n_ref_tokens": 37,
+      "mer_fe": 0.08108108108108109
     },
     {
       "id": "ZH-CN_U0062_S0_4",
@@ -1587,7 +1718,8 @@
       "mer": 0.05555555555555555,
       "cer_zh": 0.05555555555555555,
       "wer_en": null,
-      "n_ref_tokens": 18
+      "n_ref_tokens": 18,
+      "mer_fe": 0.05555555555555555
     },
     {
       "id": "ZH-CN_U0063_S0_6",
@@ -1599,7 +1731,8 @@
       "mer": 0.25,
       "cer_zh": 0.25,
       "wer_en": null,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.25
     },
     {
       "id": "ZH-CN_U0064_S0_479",
@@ -1611,7 +1744,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 5
+      "n_ref_tokens": 5,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0081_S0_78",
@@ -1623,7 +1757,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 22
+      "n_ref_tokens": 22,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0082_S0_151",
@@ -1635,7 +1770,8 @@
       "mer": 0.0392156862745098,
       "cer_zh": 0.0392156862745098,
       "wer_en": null,
-      "n_ref_tokens": 51
+      "n_ref_tokens": 51,
+      "mer_fe": 0.0392156862745098
     },
     {
       "id": "ZH-CN_U1003_S0_212",
@@ -1647,7 +1783,8 @@
       "mer": 0.006329113924050633,
       "cer_zh": 0.006329113924050633,
       "wer_en": null,
-      "n_ref_tokens": 158
+      "n_ref_tokens": 158,
+      "mer_fe": 0.006329113924050633
     },
     {
       "id": "ZH-CN_U1004_S0_297",
@@ -1659,7 +1796,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 5
+      "n_ref_tokens": 5,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1007_S0_175",
@@ -1671,7 +1809,8 @@
       "mer": 0.015873015873015872,
       "cer_zh": 0.015873015873015872,
       "wer_en": null,
-      "n_ref_tokens": 63
+      "n_ref_tokens": 63,
+      "mer_fe": 0.015873015873015872
     },
     {
       "id": "ZH-CN_U1008_S0_51",
@@ -1683,7 +1822,8 @@
       "mer": 0.02702702702702703,
       "cer_zh": 0.02702702702702703,
       "wer_en": null,
-      "n_ref_tokens": 37
+      "n_ref_tokens": 37,
+      "mer_fe": 0.02702702702702703
     },
     {
       "id": "ZH-CN_U1021_S0_114",
@@ -1695,7 +1835,8 @@
       "mer": 0.05,
       "cer_zh": 0.05,
       "wer_en": null,
-      "n_ref_tokens": 40
+      "n_ref_tokens": 40,
+      "mer_fe": 0.02564102564102564
     },
     {
       "id": "ZH-CN_U1022_S0_202",
@@ -1707,7 +1848,8 @@
       "mer": 0.07142857142857142,
       "cer_zh": 0.07142857142857142,
       "wer_en": null,
-      "n_ref_tokens": 14
+      "n_ref_tokens": 14,
+      "mer_fe": 0.07142857142857142
     },
     {
       "id": "ZH-CN_U1031_S0_245",
@@ -1719,7 +1861,8 @@
       "mer": 0.13043478260869565,
       "cer_zh": 0.13043478260869565,
       "wer_en": null,
-      "n_ref_tokens": 23
+      "n_ref_tokens": 23,
+      "mer_fe": 0.13043478260869565
     },
     {
       "id": "ZH-CN_U1032_S0_69",
@@ -1731,7 +1874,8 @@
       "mer": 0.5,
       "cer_zh": 0.5,
       "wer_en": null,
-      "n_ref_tokens": 8
+      "n_ref_tokens": 8,
+      "mer_fe": 0.5
     },
     {
       "id": "ZH-CN_U1053_S0_187",
@@ -1743,7 +1887,8 @@
       "mer": 0.057692307692307696,
       "cer_zh": 0.057692307692307696,
       "wer_en": null,
-      "n_ref_tokens": 52
+      "n_ref_tokens": 52,
+      "mer_fe": 0.057692307692307696
     },
     {
       "id": "ZH-CN_U1054_S0_186",
@@ -1755,7 +1900,8 @@
       "mer": 0.025974025974025976,
       "cer_zh": 0.025974025974025976,
       "wer_en": null,
-      "n_ref_tokens": 77
+      "n_ref_tokens": 77,
+      "mer_fe": 0.025974025974025976
     },
     {
       "id": "ZH-CN_U1103_S0_302",
@@ -1767,7 +1913,8 @@
       "mer": 0.04918032786885246,
       "cer_zh": 0.04918032786885246,
       "wer_en": null,
-      "n_ref_tokens": 61
+      "n_ref_tokens": 61,
+      "mer_fe": 0.04918032786885246
     },
     {
       "id": "ZH-CN_U1104_S0_349",
@@ -1779,7 +1926,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 8
+      "n_ref_tokens": 8,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2003_S0_60",
@@ -1791,7 +1939,8 @@
       "mer": 0.045454545454545456,
       "cer_zh": 0.045454545454545456,
       "wer_en": null,
-      "n_ref_tokens": 22
+      "n_ref_tokens": 22,
+      "mer_fe": 0.045454545454545456
     },
     {
       "id": "ZH-CN_U2004_S0_226",
@@ -1803,7 +1952,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 19
+      "n_ref_tokens": 19,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0023_S0_558",
@@ -1815,7 +1965,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 20
+      "n_ref_tokens": 20,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0024_S0_720",
@@ -1827,7 +1978,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 49
+      "n_ref_tokens": 49,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0025_S0_451",
@@ -1839,7 +1991,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 39
+      "n_ref_tokens": 39,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0026_S0_147",
@@ -1851,7 +2004,8 @@
       "mer": 0.1111111111111111,
       "cer_zh": 0.1111111111111111,
       "wer_en": null,
-      "n_ref_tokens": 9
+      "n_ref_tokens": 9,
+      "mer_fe": 0.1111111111111111
     },
     {
       "id": "ZH-CN_U0035_S0_610",
@@ -1863,7 +2017,8 @@
       "mer": 0.07344632768361582,
       "cer_zh": 0.07344632768361582,
       "wer_en": null,
-      "n_ref_tokens": 177
+      "n_ref_tokens": 177,
+      "mer_fe": 0.06779661016949153
     },
     {
       "id": "ZH-CN_U0036_S0_19",
@@ -1875,7 +2030,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0049_S0_103",
@@ -1887,7 +2043,8 @@
       "mer": 0.022988505747126436,
       "cer_zh": 0.022988505747126436,
       "wer_en": null,
-      "n_ref_tokens": 87
+      "n_ref_tokens": 87,
+      "mer_fe": 0.022988505747126436
     },
     {
       "id": "ZH-CN_U0050_S0_72",
@@ -1899,7 +2056,8 @@
       "mer": 0.030303030303030304,
       "cer_zh": 0.030303030303030304,
       "wer_en": null,
-      "n_ref_tokens": 99
+      "n_ref_tokens": 99,
+      "mer_fe": 0.030303030303030304
     },
     {
       "id": "ZH-CN_U0059_S0_3",
@@ -1911,7 +2069,8 @@
       "mer": 0.11764705882352941,
       "cer_zh": 0.11764705882352941,
       "wer_en": null,
-      "n_ref_tokens": 17
+      "n_ref_tokens": 17,
+      "mer_fe": 0.11764705882352941
     },
     {
       "id": "ZH-CN_U0060_S0_8",
@@ -1923,7 +2082,8 @@
       "mer": 0.08333333333333333,
       "cer_zh": 0.08333333333333333,
       "wer_en": null,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.08333333333333333
     },
     {
       "id": "ZH-CN_U0061_S0_205",
@@ -1935,7 +2095,8 @@
       "mer": 0.2727272727272727,
       "cer_zh": 0.2727272727272727,
       "wer_en": null,
-      "n_ref_tokens": 11
+      "n_ref_tokens": 11,
+      "mer_fe": 0.2727272727272727
     },
     {
       "id": "ZH-CN_U0062_S0_211",
@@ -1947,7 +2108,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 37
+      "n_ref_tokens": 37,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0063_S0_53",
@@ -1959,7 +2121,8 @@
       "mer": 0.031746031746031744,
       "cer_zh": 0.031746031746031744,
       "wer_en": null,
-      "n_ref_tokens": 63
+      "n_ref_tokens": 63,
+      "mer_fe": 0.031746031746031744
     },
     {
       "id": "ZH-CN_U0064_S0_184",
@@ -1971,7 +2134,8 @@
       "mer": 0.16666666666666666,
       "cer_zh": 0.16666666666666666,
       "wer_en": null,
-      "n_ref_tokens": 6
+      "n_ref_tokens": 6,
+      "mer_fe": 0.16666666666666666
     },
     {
       "id": "ZH-CN_U0081_S0_83",
@@ -1983,7 +2147,8 @@
       "mer": 0.06666666666666667,
       "cer_zh": 0.06666666666666667,
       "wer_en": null,
-      "n_ref_tokens": 30
+      "n_ref_tokens": 30,
+      "mer_fe": 0.06666666666666667
     },
     {
       "id": "ZH-CN_U0082_S0_149",
@@ -1995,7 +2160,8 @@
       "mer": 0.125,
       "cer_zh": 0.125,
       "wer_en": null,
-      "n_ref_tokens": 8
+      "n_ref_tokens": 8,
+      "mer_fe": 0.125
     },
     {
       "id": "ZH-CN_U1003_S0_36",
@@ -2007,7 +2173,8 @@
       "mer": 0.015228426395939087,
       "cer_zh": 0.015228426395939087,
       "wer_en": null,
-      "n_ref_tokens": 197
+      "n_ref_tokens": 197,
+      "mer_fe": 0.015228426395939087
     },
     {
       "id": "ZH-CN_U1004_S0_144",
@@ -2019,7 +2186,8 @@
       "mer": 0.011976047904191617,
       "cer_zh": 0.011976047904191617,
       "wer_en": null,
-      "n_ref_tokens": 167
+      "n_ref_tokens": 167,
+      "mer_fe": 0.011976047904191617
     },
     {
       "id": "ZH-CN_U1007_S0_117",
@@ -2031,7 +2199,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 12
+      "n_ref_tokens": 12,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1008_S0_188",
@@ -2043,7 +2212,8 @@
       "mer": 0.011627906976744186,
       "cer_zh": 0.011627906976744186,
       "wer_en": null,
-      "n_ref_tokens": 86
+      "n_ref_tokens": 86,
+      "mer_fe": 0.011627906976744186
     },
     {
       "id": "ZH-CN_U1021_S0_215",
@@ -2055,7 +2225,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 121
+      "n_ref_tokens": 121,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1022_S0_80",
@@ -2067,7 +2238,8 @@
       "mer": 0.05747126436781609,
       "cer_zh": 0.05747126436781609,
       "wer_en": null,
-      "n_ref_tokens": 87
+      "n_ref_tokens": 87,
+      "mer_fe": 0.05747126436781609
     },
     {
       "id": "ZH-CN_U1031_S0_81",
@@ -2079,7 +2251,8 @@
       "mer": 0.05263157894736842,
       "cer_zh": 0.05263157894736842,
       "wer_en": null,
-      "n_ref_tokens": 38
+      "n_ref_tokens": 38,
+      "mer_fe": 0.05263157894736842
     },
     {
       "id": "ZH-CN_U1032_S0_145",
@@ -2091,7 +2264,8 @@
       "mer": 0.050724637681159424,
       "cer_zh": 0.050724637681159424,
       "wer_en": null,
-      "n_ref_tokens": 138
+      "n_ref_tokens": 138,
+      "mer_fe": 0.050724637681159424
     },
     {
       "id": "ZH-CN_U1053_S0_185",
@@ -2103,7 +2277,8 @@
       "mer": 0.0379746835443038,
       "cer_zh": 0.0379746835443038,
       "wer_en": null,
-      "n_ref_tokens": 79
+      "n_ref_tokens": 79,
+      "mer_fe": 0.0379746835443038
     },
     {
       "id": "ZH-CN_U1054_S0_178",
@@ -2115,7 +2290,8 @@
       "mer": 0.030303030303030304,
       "cer_zh": 0.030303030303030304,
       "wer_en": null,
-      "n_ref_tokens": 33
+      "n_ref_tokens": 33,
+      "mer_fe": 0.030303030303030304
     },
     {
       "id": "ZH-CN_U1103_S0_325",
@@ -2127,7 +2303,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 26
+      "n_ref_tokens": 26,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1104_S0_363",
@@ -2139,7 +2316,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 6
+      "n_ref_tokens": 6,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2003_S0_44",
@@ -2151,7 +2329,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 28
+      "n_ref_tokens": 28,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2004_S0_47",
@@ -2163,7 +2342,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 10
+      "n_ref_tokens": 10,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0023_S0_630",
@@ -2175,7 +2355,8 @@
       "mer": 0.014084507042253521,
       "cer_zh": 0.014084507042253521,
       "wer_en": null,
-      "n_ref_tokens": 71
+      "n_ref_tokens": 71,
+      "mer_fe": 0.014084507042253521
     },
     {
       "id": "ZH-CN_U0024_S0_714",
@@ -2187,7 +2368,8 @@
       "mer": 0.012345679012345678,
       "cer_zh": 0.012345679012345678,
       "wer_en": null,
-      "n_ref_tokens": 81
+      "n_ref_tokens": 81,
+      "mer_fe": 0.012345679012345678
     },
     {
       "id": "ZH-CN_U0025_S0_421",
@@ -2199,7 +2381,8 @@
       "mer": 0.0049504950495049506,
       "cer_zh": 0.0049504950495049506,
       "wer_en": null,
-      "n_ref_tokens": 202
+      "n_ref_tokens": 202,
+      "mer_fe": 0.0049504950495049506
     },
     {
       "id": "ZH-CN_U0026_S0_18",
@@ -2211,7 +2394,8 @@
       "mer": 0.04,
       "cer_zh": 0.04,
       "wer_en": null,
-      "n_ref_tokens": 25
+      "n_ref_tokens": 25,
+      "mer_fe": 0.04
     },
     {
       "id": "ZH-CN_U0035_S0_791",
@@ -2223,7 +2407,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 27
+      "n_ref_tokens": 27,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0036_S0_33",
@@ -2235,7 +2420,8 @@
       "mer": 0.3333333333333333,
       "cer_zh": 0.3333333333333333,
       "wer_en": null,
-      "n_ref_tokens": 18
+      "n_ref_tokens": 18,
+      "mer_fe": 0.3333333333333333
     },
     {
       "id": "ZH-CN_U0049_S0_151",
@@ -2247,7 +2433,8 @@
       "mer": 0.05,
       "cer_zh": 0.05,
       "wer_en": null,
-      "n_ref_tokens": 120
+      "n_ref_tokens": 120,
+      "mer_fe": 0.05
     },
     {
       "id": "ZH-CN_U0050_S0_13",
@@ -2259,7 +2446,8 @@
       "mer": 0.024691358024691357,
       "cer_zh": 0.024691358024691357,
       "wer_en": null,
-      "n_ref_tokens": 81
+      "n_ref_tokens": 81,
+      "mer_fe": 0.024691358024691357
     },
     {
       "id": "ZH-CN_U0059_S0_376",
@@ -2271,7 +2459,8 @@
       "mer": 0.01775147928994083,
       "cer_zh": 0.01775147928994083,
       "wer_en": null,
-      "n_ref_tokens": 169
+      "n_ref_tokens": 169,
+      "mer_fe": 0.01775147928994083
     },
     {
       "id": "ZH-CN_U0060_S0_167",
@@ -2283,7 +2472,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 13
+      "n_ref_tokens": 13,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0061_S0_584",
@@ -2295,7 +2485,8 @@
       "mer": 0.011111111111111112,
       "cer_zh": 0.011111111111111112,
       "wer_en": null,
-      "n_ref_tokens": 90
+      "n_ref_tokens": 90,
+      "mer_fe": 0.011111111111111112
     },
     {
       "id": "ZH-CN_U0062_S0_73",
@@ -2307,7 +2498,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 29
+      "n_ref_tokens": 29,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0063_S0_178",
@@ -2319,7 +2511,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 22
+      "n_ref_tokens": 22,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0064_S0_460",
@@ -2331,7 +2524,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 22
+      "n_ref_tokens": 22,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0081_S0_202",
@@ -2343,7 +2537,8 @@
       "mer": 0.030303030303030304,
       "cer_zh": 0.030303030303030304,
       "wer_en": null,
-      "n_ref_tokens": 33
+      "n_ref_tokens": 33,
+      "mer_fe": 0.030303030303030304
     },
     {
       "id": "ZH-CN_U0082_S0_175",
@@ -2355,7 +2550,8 @@
       "mer": 0.0594059405940594,
       "cer_zh": 0.0594059405940594,
       "wer_en": null,
-      "n_ref_tokens": 101
+      "n_ref_tokens": 101,
+      "mer_fe": 0.0594059405940594
     },
     {
       "id": "ZH-CN_U1003_S0_69",
@@ -2367,7 +2563,8 @@
       "mer": 0.02531645569620253,
       "cer_zh": 0.02531645569620253,
       "wer_en": null,
-      "n_ref_tokens": 237
+      "n_ref_tokens": 237,
+      "mer_fe": 0.02531645569620253
     },
     {
       "id": "ZH-CN_U1004_S0_43",
@@ -2379,7 +2576,8 @@
       "mer": 0.04054054054054054,
       "cer_zh": 0.04054054054054054,
       "wer_en": null,
-      "n_ref_tokens": 74
+      "n_ref_tokens": 74,
+      "mer_fe": 0.04054054054054054
     },
     {
       "id": "ZH-CN_U1007_S0_51",
@@ -2391,7 +2589,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 21
+      "n_ref_tokens": 21,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1008_S0_247",
@@ -2403,7 +2602,8 @@
       "mer": 0.03125,
       "cer_zh": 0.03125,
       "wer_en": null,
-      "n_ref_tokens": 32
+      "n_ref_tokens": 32,
+      "mer_fe": 0.03125
     },
     {
       "id": "ZH-CN_U1021_S0_75",
@@ -2415,7 +2615,8 @@
       "mer": 0.08,
       "cer_zh": 0.08,
       "wer_en": null,
-      "n_ref_tokens": 100
+      "n_ref_tokens": 100,
+      "mer_fe": 0.07
     },
     {
       "id": "ZH-CN_U1022_S0_102",
@@ -2427,7 +2628,8 @@
       "mer": 0.05454545454545454,
       "cer_zh": 0.05454545454545454,
       "wer_en": null,
-      "n_ref_tokens": 55
+      "n_ref_tokens": 55,
+      "mer_fe": 0.05454545454545454
     },
     {
       "id": "ZH-CN_U1031_S0_120",
@@ -2439,7 +2641,8 @@
       "mer": 0.058823529411764705,
       "cer_zh": 0.058823529411764705,
       "wer_en": null,
-      "n_ref_tokens": 119
+      "n_ref_tokens": 119,
+      "mer_fe": 0.058823529411764705
     },
     {
       "id": "ZH-CN_U1032_S0_75",
@@ -2451,7 +2654,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 22
+      "n_ref_tokens": 22,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1053_S0_80",
@@ -2463,7 +2667,8 @@
       "mer": 0.1111111111111111,
       "cer_zh": 0.1111111111111111,
       "wer_en": null,
-      "n_ref_tokens": 18
+      "n_ref_tokens": 18,
+      "mer_fe": 0.1111111111111111
     },
     {
       "id": "ZH-CN_U1054_S0_94",
@@ -2475,7 +2680,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 60
+      "n_ref_tokens": 60,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1103_S0_197",
@@ -2487,7 +2693,8 @@
       "mer": 0.16666666666666666,
       "cer_zh": 0.16666666666666666,
       "wer_en": null,
-      "n_ref_tokens": 6
+      "n_ref_tokens": 6,
+      "mer_fe": 0.16666666666666666
     },
     {
       "id": "ZH-CN_U1104_S0_353",
@@ -2499,7 +2706,8 @@
       "mer": 0.04477611940298507,
       "cer_zh": 0.04477611940298507,
       "wer_en": null,
-      "n_ref_tokens": 67
+      "n_ref_tokens": 67,
+      "mer_fe": 0.04477611940298507
     },
     {
       "id": "ZH-CN_U2003_S0_208",
@@ -2511,7 +2719,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 46
+      "n_ref_tokens": 46,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2004_S0_262",
@@ -2523,7 +2732,8 @@
       "mer": 0.05,
       "cer_zh": 0.05,
       "wer_en": null,
-      "n_ref_tokens": 20
+      "n_ref_tokens": 20,
+      "mer_fe": 0.05
     },
     {
       "id": "ZH-CN_U0023_S0_641",
@@ -2535,7 +2745,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 20
+      "n_ref_tokens": 20,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0024_S0_882",
@@ -2547,7 +2758,8 @@
       "mer": 0.044642857142857144,
       "cer_zh": 0.044642857142857144,
       "wer_en": null,
-      "n_ref_tokens": 112
+      "n_ref_tokens": 112,
+      "mer_fe": 0.044642857142857144
     },
     {
       "id": "ZH-CN_U0025_S0_135",
@@ -2559,7 +2771,8 @@
       "mer": 0.02962962962962963,
       "cer_zh": 0.02962962962962963,
       "wer_en": null,
-      "n_ref_tokens": 135
+      "n_ref_tokens": 135,
+      "mer_fe": 0.02962962962962963
     },
     {
       "id": "ZH-CN_U0026_S0_309",
@@ -2571,7 +2784,8 @@
       "mer": 0.02564102564102564,
       "cer_zh": 0.02564102564102564,
       "wer_en": null,
-      "n_ref_tokens": 39
+      "n_ref_tokens": 39,
+      "mer_fe": 0.02564102564102564
     },
     {
       "id": "ZH-CN_U0035_S0_10",
@@ -2583,7 +2797,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 16
+      "n_ref_tokens": 16,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0036_S0_49",
@@ -2595,7 +2810,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 15
+      "n_ref_tokens": 15,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0049_S0_147",
@@ -2607,7 +2823,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 70
+      "n_ref_tokens": 70,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0050_S0_101",
@@ -2619,7 +2836,8 @@
       "mer": 0.023809523809523808,
       "cer_zh": 0.023809523809523808,
       "wer_en": null,
-      "n_ref_tokens": 84
+      "n_ref_tokens": 84,
+      "mer_fe": 0.023809523809523808
     },
     {
       "id": "ZH-CN_U0059_S0_126",
@@ -2631,7 +2849,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 51
+      "n_ref_tokens": 51,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0060_S0_339",
@@ -2643,7 +2862,8 @@
       "mer": 0.05263157894736842,
       "cer_zh": 0.05263157894736842,
       "wer_en": null,
-      "n_ref_tokens": 19
+      "n_ref_tokens": 19,
+      "mer_fe": 0.05263157894736842
     },
     {
       "id": "ZH-CN_U0061_S0_65",
@@ -2655,7 +2875,8 @@
       "mer": 0.05263157894736842,
       "cer_zh": 0.05263157894736842,
       "wer_en": null,
-      "n_ref_tokens": 19
+      "n_ref_tokens": 19,
+      "mer_fe": 0.05263157894736842
     },
     {
       "id": "ZH-CN_U0062_S0_64",
@@ -2667,7 +2888,8 @@
       "mer": 0.013333333333333334,
       "cer_zh": 0.013333333333333334,
       "wer_en": null,
-      "n_ref_tokens": 75
+      "n_ref_tokens": 75,
+      "mer_fe": 0.013333333333333334
     },
     {
       "id": "ZH-CN_U0063_S0_145",
@@ -2679,7 +2901,8 @@
       "mer": 0.023255813953488372,
       "cer_zh": 0.023255813953488372,
       "wer_en": null,
-      "n_ref_tokens": 43
+      "n_ref_tokens": 43,
+      "mer_fe": 0.023255813953488372
     },
     {
       "id": "ZH-CN_U0064_S0_49",
@@ -2691,7 +2914,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 6
+      "n_ref_tokens": 6,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U0081_S0_208",
@@ -2703,7 +2927,8 @@
       "mer": 0.038461538461538464,
       "cer_zh": 0.038461538461538464,
       "wer_en": null,
-      "n_ref_tokens": 52
+      "n_ref_tokens": 52,
+      "mer_fe": 0.038461538461538464
     },
     {
       "id": "ZH-CN_U0082_S0_155",
@@ -2715,7 +2940,8 @@
       "mer": 0.023529411764705882,
       "cer_zh": 0.023529411764705882,
       "wer_en": null,
-      "n_ref_tokens": 85
+      "n_ref_tokens": 85,
+      "mer_fe": 0.023529411764705882
     },
     {
       "id": "ZH-CN_U1003_S0_158",
@@ -2727,7 +2953,8 @@
       "mer": 0.02666666666666667,
       "cer_zh": 0.02666666666666667,
       "wer_en": null,
-      "n_ref_tokens": 75
+      "n_ref_tokens": 75,
+      "mer_fe": 0.02666666666666667
     },
     {
       "id": "ZH-CN_U1004_S0_25",
@@ -2739,7 +2966,8 @@
       "mer": 0.02127659574468085,
       "cer_zh": 0.02127659574468085,
       "wer_en": null,
-      "n_ref_tokens": 47
+      "n_ref_tokens": 47,
+      "mer_fe": 0.02127659574468085
     },
     {
       "id": "ZH-CN_U1007_S0_58",
@@ -2751,7 +2979,8 @@
       "mer": 0.028735632183908046,
       "cer_zh": 0.028735632183908046,
       "wer_en": null,
-      "n_ref_tokens": 174
+      "n_ref_tokens": 174,
+      "mer_fe": 0.028735632183908046
     },
     {
       "id": "ZH-CN_U1008_S0_289",
@@ -2763,7 +2992,8 @@
       "mer": 0.03664921465968586,
       "cer_zh": 0.03664921465968586,
       "wer_en": null,
-      "n_ref_tokens": 191
+      "n_ref_tokens": 191,
+      "mer_fe": 0.03664921465968586
     },
     {
       "id": "ZH-CN_U1021_S0_100",
@@ -2775,7 +3005,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 24
+      "n_ref_tokens": 24,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1022_S0_223",
@@ -2787,7 +3018,8 @@
       "mer": 0.16666666666666666,
       "cer_zh": 0.16666666666666666,
       "wer_en": null,
-      "n_ref_tokens": 6
+      "n_ref_tokens": 6,
+      "mer_fe": 0.16666666666666666
     },
     {
       "id": "ZH-CN_U1031_S0_116",
@@ -2799,7 +3031,8 @@
       "mer": 0.04411764705882353,
       "cer_zh": 0.04411764705882353,
       "wer_en": null,
-      "n_ref_tokens": 68
+      "n_ref_tokens": 68,
+      "mer_fe": 0.04411764705882353
     },
     {
       "id": "ZH-CN_U1032_S0_117",
@@ -2811,7 +3044,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 7
+      "n_ref_tokens": 7,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U1053_S0_176",
@@ -2823,7 +3057,8 @@
       "mer": 0.10714285714285714,
       "cer_zh": 0.10714285714285714,
       "wer_en": null,
-      "n_ref_tokens": 28
+      "n_ref_tokens": 28,
+      "mer_fe": 0.10714285714285714
     },
     {
       "id": "ZH-CN_U1054_S0_112",
@@ -2835,7 +3070,8 @@
       "mer": 0.021739130434782608,
       "cer_zh": 0.021739130434782608,
       "wer_en": null,
-      "n_ref_tokens": 46
+      "n_ref_tokens": 46,
+      "mer_fe": 0.021739130434782608
     },
     {
       "id": "ZH-CN_U1103_S0_321",
@@ -2847,7 +3083,8 @@
       "mer": 0.14285714285714285,
       "cer_zh": 0.14285714285714285,
       "wer_en": null,
-      "n_ref_tokens": 14
+      "n_ref_tokens": 14,
+      "mer_fe": 0.14285714285714285
     },
     {
       "id": "ZH-CN_U1104_S0_172",
@@ -2859,7 +3096,8 @@
       "mer": 0.06060606060606061,
       "cer_zh": 0.06060606060606061,
       "wer_en": null,
-      "n_ref_tokens": 99
+      "n_ref_tokens": 99,
+      "mer_fe": 0.06060606060606061
     },
     {
       "id": "ZH-CN_U2003_S0_216",
@@ -2871,7 +3109,8 @@
       "mer": 0.0,
       "cer_zh": 0.0,
       "wer_en": null,
-      "n_ref_tokens": 14
+      "n_ref_tokens": 14,
+      "mer_fe": 0.0
     },
     {
       "id": "ZH-CN_U2004_S0_94",
@@ -2883,7 +3122,8 @@
       "mer": 0.05555555555555555,
       "cer_zh": 0.05555555555555555,
       "wer_en": null,
-      "n_ref_tokens": 18
+      "n_ref_tokens": 18,
+      "mer_fe": 0.05555555555555555
     }
   ],
   "summary": {
@@ -2909,7 +3149,10 @@
     "min_mer": 0.0,
     "max_mer": 1.0,
     "n_samples": 240,
-    "n_errors": 0
+    "n_errors": 0,
+    "avg_mer_fe": 0.06857455581576172,
+    "min_mer_fe": 0.0,
+    "max_mer_fe": 1.0
   },
   "generated_at": "2026-07-16T10:32:30"
 }

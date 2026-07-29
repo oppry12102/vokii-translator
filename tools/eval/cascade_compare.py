@@ -58,6 +58,10 @@ def summary(report: dict) -> dict:
     s["n"] = len(rows)
     s["avg_mer"] = mean(r["mer"] for r in rows)
     s["median_mer"] = median(r["mer"] for r in rows)
+    if any("mer_fe" in r and r["mer_fe"] is not None for r in rows):
+        # filler-equivalence secondary metric (see metrics.py); shown only
+        # when present, so old reports print exactly as before.
+        s["avg_mer_fe"] = mean(r["mer_fe"] for r in rows if r["mer_fe"] is not None)
     if any("cer_zh" in r and r["cer_zh"] is not None for r in rows):
         s["avg_cer_zh"] = mean(r["cer_zh"] for r in rows if r["cer_zh"] is not None)
     if any("wer_en" in r and r["wer_en"] is not None for r in rows):
@@ -185,6 +189,11 @@ def print_summary_table(reports_full: List[tuple], summaries: List[tuple]) -> No
         (">0.50",        lambda s: s.get("gt_050")),
         ("empty",        lambda s: s.get("empty")),
     ]
+    if any(s.get("avg_mer_fe") is not None for _, s in summaries):
+        # filler-equivalence secondary metric — only when at least one
+        # report carries mer_fe (missing reports print "None", same style
+        # as the per-language rows on single-language sets).
+        rows.insert(3, ("avg MER_fe", lambda s: s.get("avg_mer_fe")))
     for label, fn in rows:
         vals = [fn(s) for _, s in summaries]
         formatted = [fmt(v) if isinstance(v, float) else str(v) for v in vals]
@@ -253,7 +262,7 @@ def print_csv(reports: List[tuple], summaries: List[tuple]) -> None:
     pastes into Excel. Uses summaries for head-row stats; reports for the
     length-bucket breakdown."""
     print("\n=== CSV (paste into a spreadsheet) ===\n")
-    keys = ["n", "avg_mer", "median_mer", "avg_cer_zh", "avg_wer_en",
+    keys = ["n", "avg_mer", "median_mer", "avg_mer_fe", "avg_cer_zh", "avg_wer_en",
             "perfect", "le_005", "le_010", "le_020", "gt_050", "empty"]
     names = [n for n, _ in summaries]
     print(",".join(["metric"] + names))

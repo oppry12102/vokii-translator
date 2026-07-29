@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from metrics import aggregate, mixed_error_rate
+from metrics import aggregate, filler_equiv_mer, mixed_error_rate
 from qwen_client import load_wav_as_pcm16_mono
 
 import dashscope
@@ -226,6 +226,7 @@ def score(result: Step1Result, ref: str) -> dict:
     if ref and not result.error:
         m = mixed_error_rate(ref, result.transcript)
         out["mer"] = m.mer
+        out["mer_fe"] = filler_equiv_mer(ref, result.transcript)
         out["cer_zh"] = m.cer_zh if m.n_ref_zh else None
         out["wer_en"] = m.wer_en if m.n_ref_en else None
         out["n_ref_tokens"] = m.n_ref_tokens

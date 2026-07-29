@@ -23,6 +23,7 @@
 |------|-------|
 | **Mean** | **0.112** |
 | **Median** | **0.020** |
+| Mean (filler-equiv, `mer_fe`) | **0.095** — secondary metric added 2026-07-29, see README |
 | P50 | 0.020 |
 | P90 | 0.267 |
 | P95 | 0.667 |
