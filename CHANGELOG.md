@@ -14,9 +14,11 @@ project adheres loosely to [Semantic Versioning](https://semver.org/).
   consistency across turns. Settings-only (not in the voice catalog);
   spec drafts share the same prompt so drafts stay consistent with
   finals. Costs ~10–20 ms prefill per sentence; the cache structure is
-  unchanged (the session-context tail was already dynamic). Quality
-  benefit not yet eval-verified — a cascade_step2 A/B on CS-Dialogue gold
-  translations is the planned validation.
+  unchanged (the session-context tail was already dynamic). Validated on
+  CS-Dialogue (`tools/eval/REPORT.mt_context_ab.md`, 8 sessions × 30
+  turns, blind LLM-judge): on turns where history actually changed the
+  translation (n=100), context wins 58:42 — modest positive, verbatim
+  fidelity cost −0.4 pt. Stays experimental, default OFF.
 
 ## [v2.5.2] — 2026-07-29
 
