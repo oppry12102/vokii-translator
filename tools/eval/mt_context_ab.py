@@ -65,7 +65,7 @@ MAX_HISTORY_TURNS = 6          # SessionContext.MAX_HISTORY_TURNS
 # mtHistoryContext branch (SessionContext.java, added 2026-07-29).
 # ---------------------------------------------------------------------
 
-def history_section(pairs: List[tuple]) -> str:
+def history_section(pairs: List[tuple], guard: bool = False) -> str:
     sb = []
     sb.append("\n\nCONVERSATION HISTORY (reference only)\n")
     sb.append("=====================================\n")
@@ -74,6 +74,13 @@ def history_section(pairs: List[tuple]) -> str:
               "input that follows; never re-translate or answer the history.\n")
     for i, (src, tgt) in enumerate(pairs, 1):
         sb.append(f'  {i}. "{src}" → "{tgt}"\n')
+    if guard:
+        # Promotion-path fix for the line-1 contamination found at full
+        # scale (REPORT.mt_context_ab.md): with history, the model drags
+        # line 1 off the verbatim source (0.145 → 0.226 MER vs gold).
+        sb.append("\nREMINDER: line 1 of your output must be EXACTLY the new "
+                  "input, character for character — do NOT use the history "
+                  "to alter it in any way.\n")
     return "".join(sb)
 
 
@@ -137,8 +144,9 @@ def load_sessions(sessions_n: int, turns_n: int) -> List[dict]:
         keys = [keys[int(i * step)] for i in range(sessions_n)]
     out = []
     for k in keys:
+        ids_k = by_session[k] if turns_n <= 0 else by_session[k][:turns_n]
         turns = [{"id": sid, "ref": refs.get(sid, ""), "src": hyps[sid]}
-                 for sid in by_session[k][:turns_n]]
+                 for sid in ids_k]
         out.append({"session": k, "turns": turns})
     return out
 
@@ -147,7 +155,8 @@ def load_sessions(sessions_n: int, turns_n: int) -> List[dict]:
 # Generation
 # ---------------------------------------------------------------------
 
-def run_session(sess: dict, api_key: str, retries: int = 1) -> List[dict]:
+def run_session(sess: dict, api_key: str, guard: bool = False,
+                retries: int = 1) -> List[dict]:
     """Translate every turn in both arms, threading arm B's own outputs
     as history (source = funasr hyp, target = arm B's target line)."""
     results = []
@@ -158,7 +167,7 @@ def run_session(sess: dict, api_key: str, retries: int = 1) -> List[dict]:
         for attempt in range(retries + 1):
             try:
                 row["mt_a"] = chat(PROD_SYSTEM_PROMPT, t["src"], MT_MODEL, api_key)
-                sys_b = (PROD_SYSTEM_PROMPT + history_section(hist_b)
+                sys_b = (PROD_SYSTEM_PROMPT + history_section(hist_b, guard)
                          if hist_b else PROD_SYSTEM_PROMPT)
                 row["mt_b"] = chat(sys_b, t["src"], MT_MODEL, api_key)
                 row["error"] = None
@@ -304,6 +313,11 @@ def main() -> int:
     p.add_argument("--report", default="report.mt_context_ab.json")
     p.add_argument("--judge-only", action="store_true",
                    help="skip generation; re-run only the judge on --report")
+    p.add_argument("--guard", action="store_true",
+                   help="arm B gets the line-1 verbatim REMINDER after the "
+                        "history section (promotion-path fix)")
+    p.add_argument("--no-judge", action="store_true",
+                   help="generation + objective metrics only, skip the judge")
     args = p.parse_args()
     api_key = _set_api_key(args.api_key)
 
@@ -313,10 +327,10 @@ def main() -> int:
         sessions = load_sessions(args.sessions, args.turns)
         total = sum(len(s["turns"]) for s in sessions)
         print(f"{len(sessions)} sessions, {total} turns "
-              f"(hist cap {MAX_HISTORY_TURNS})", file=sys.stderr)
+              f"(hist cap {MAX_HISTORY_TURNS}, guard={args.guard})", file=sys.stderr)
         samples: List[dict] = []
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
-            futs = {pool.submit(run_session, s, api_key): s["session"]
+            futs = {pool.submit(run_session, s, api_key, args.guard): s["session"]
                     for s in sessions}
             for f in as_completed(futs):
                 rows = f.result()
@@ -327,11 +341,17 @@ def main() -> int:
         report = {"config": {"sessions": args.sessions, "turns": args.turns,
                              "mt_model": MT_MODEL, "judge_model": JUDGE_MODEL,
                              "hist_cap": MAX_HISTORY_TURNS,
+                             "guard": args.guard,
                              "source": "fun-asr-realtime n=6186 hyps"},
                   "samples": sorted(samples, key=lambda r: r["id"])}
         report["objective"] = objective_metrics(report["samples"])
         print("objective:", json.dumps(report["objective"], ensure_ascii=False),
               file=sys.stderr)
+        if args.no_judge:
+            Path(args.report).write_text(
+                json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"Report written: {args.report}")
+            return 0
 
     report["judge"] = run_judge(report, api_key, args.workers)
     j = report["judge"]

@@ -15,10 +15,14 @@ project adheres loosely to [Semantic Versioning](https://semver.org/).
   spec drafts share the same prompt so drafts stay consistent with
   finals. Costs ~10–20 ms prefill per sentence; the cache structure is
   unchanged (the session-context tail was already dynamic). Validated on
-  CS-Dialogue (`tools/eval/REPORT.mt_context_ab.md`, 8 sessions × 30
-  turns, blind LLM-judge): on turns where history actually changed the
-  translation (n=100), context wins 58:42 — modest positive, verbatim
-  fidelity cost −0.4 pt. Stays experimental, default OFF.
+  CS-Dialogue (`tools/eval/REPORT.mt_context_ab.md`): full-scale (all 30
+  sessions, 6,186 turns, blind LLM-judge) shows a weak translation-side
+  win (+99 net on 2,820 materially-changed turns) but a decisive
+  verbatim-line contamination (line-1 vs gold MER 0.144 → 0.226) —
+  history harmonizes the source echo toward the model's own prior
+  phrasing, not toward gold. A guard prompt fixes fidelity but spends
+  the benefit. Stays experimental, default OFF; recommended path is an
+  app-side change to always commit ASR verbatim (never MT line 1).
 
 ## [v2.5.2] — 2026-07-29
 

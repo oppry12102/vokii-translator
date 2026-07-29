@@ -58,6 +58,60 @@ cost is 0.4 pt. Promotion to default-ON would want a bigger-n judge run
 (e.g. repeating "line 1 = EXACTLY the new input" after the history
 section).
 
+---
+
+# Full-scale follow-up (same day): all 30 sessions, 6,186 turns
+
+The 240-turn window understated the verbatim-line risk. Full-scale runs
+(generation ×2 + judge ×2, ~25k API calls, 0 generation errors):
+
+| | A (baseline) | B (history) | B+guard |
+|---|---|---|---|
+| **line-1 vs GOLD MER** (contamination) | 0.144 | **0.226** | **0.150** |
+| verbatim-line fidelity (vs ASR input) | 0.960 | 0.875 | 0.948 |
+| format misses (of 6,186) | 4 | 28 | 60 |
+| judge material-bucket net (B−A) | — | **+99 / 2,820** (p≈0.06) | +43 / 2,730 (p≈0.4) |
+| judge identical-bucket forced prefs | — | +57 B-skew | +53 B-skew |
+
+Notes:
+- **Contamination is real and big at scale**: with history, the model
+  drags line 1 off the ASR input toward its own prior phrasing — and NOT
+  toward the gold transcript (line-1 vs gold worsens 0.144 → 0.226;
+  closer-to-gold only 127 turns vs 179 farther). History does not fix
+  ASR errors; it corrupts the source echo.
+- Baseline surprise: even WITHOUT history, MT line 1 is worse than the
+  raw ASR hyp (0.144 vs 0.112 gold-MER) — the model "cleans up" despite
+  CORE PRINCIPLE. The app locks the verbatim column to MT line 1 at
+  commit (MainActivity.java:667-677), so this drift already ships.
+- **The guard prompt fixes contamination** (0.226 → 0.150 ≈ baseline)
+  **but spends the translation-side benefit** (+99 → +43, back inside
+  noise). The two are coupled: part of what made context "win" was the
+  harmonization freedom that also corrupts line 1.
+- Judge artifact: identical-text pairs get ~17% forced preferences with
+  a consistent +53..+57 B-skew (flip-mapping artifact), visible in both
+  runs — raw verdict margins must be read net of this.
+
+## Full-scale verdict
+
+**Translation-side benefit is weak (~52–54% decisive-verdict rate) and
+verbatim-side cost is decisive without mitigation.** Three options:
+
+1. **Keep as-is (toggle OFF)** — justified; the feature is net-negative
+   for a transcript-first product in its current form.
+2. **Guard prompt** — removes the cost but also the benefit; pointless.
+3. **App-side fix (recommended next step)**: never lock the verbatim
+   column to MT line 1 — always commit the ASR verbatim (empty-parse
+   guard already exists at MainActivity.java:677). Baseline line 1 is
+   already worse than raw ASR (0.144 vs 0.112), so MT echo adds nothing
+   on the transcript side anyway. With contamination impossible by
+   construction, UNGUARDED history keeps its modest translation win.
+   This changes commit behavior for everyone, not just toggle users —
+   product decision, needs owner sign-off.
+
+Reports: `report.mt_context_ab.full.json` (B), `report.mt_context_ab.guard.json` (B+guard).
+Reproduce: add `--sessions 30 --turns 0`; guard variant adds `--guard`
+(`--no-judge` for generation-only, `--judge-only` to re-judge).
+
 ## Reproduce
 
 ```bash
