@@ -300,9 +300,9 @@ See `tools/eval/README.md` for the full driver list and
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md). Latest tagged: **v2.5.1** — full
-CS-Dialogue transcription eval (n=6,186), README zh→fr + 3-column
-voice-command table, and the parallel `--workers` eval harness.
+See [CHANGELOG.md](CHANGELOG.md). Latest tagged: **v2.5.2** — earlier
+spec-MT drafts (device-measured −30% first-draft latency), next-gen ASR
+A/B (fun-asr holds), and the filler-equivalence secondary MER metric.
 The former `v2-cascade` development branch is merged into `main`,
 which is now the mainline.
 

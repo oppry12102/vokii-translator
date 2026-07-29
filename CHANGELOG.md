@@ -4,6 +4,34 @@ All notable changes to Vokii are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres loosely to [Semantic Versioning](https://semver.org/).
 
+## [v2.5.2] — 2026-07-29
+
+### Performance
+- **Spec-MT fires earlier**: `SPEC_MIN_CHARS` 6 → 3 after on-device latency
+  re-measure showed the 6-char gate itself was the dominant first-draft
+  cost (~0.73 s of the ~1.0 s from first ASR partial to first draft
+  visible; spec TTFB only ~0.24 s). Expected first draft ~−30%.
+
+### Eval
+- **Next-gen ASR A/B** (tier3, n=1000): fun-asr-realtime-2026-02-28
+  (+2.9% MER, not adopted) and qwen3-asr-flash-realtime (+34% MER,
+  dropped — deficit survives filler-equivalence re-scoring, so it's
+  genuine). fun-asr-realtime remains the step-1 default; DashScope
+  realtime ASR model space exhausted. Report:
+  `tools/eval/REPORT.step1.nextgen.tier3.md`; new OpenAI-Realtime protocol
+  driver `cascade_step1_qwen3asr.py`.
+- **Filler-equivalence secondary metric** (`mer_fe`): backchannel
+  written-form noise (嗯哼→"uh-huh.") no longer counts as full error in
+  the secondary track — full-set mean MER 0.112 → 0.095. Raw MER stays
+  the headline. New runs emit it; `rescore_fillereq.py` backfills old
+  reports offline.
+
+### Verified on device (2026-07-29)
+- Voice-command hallucination containment: spec-draft `toggle_mic`
+  cancelled by P1 guard; final-MT `clear_transcript` on "现在做单元测试"
+  dropped by GroundingCues + no-tools fallback retranslate — transcript
+  survived. Final-MT residual TTFB measured: 585 ms.
+
 ## [v2.5.1] — 2026-07-28
 
 ### Eval
