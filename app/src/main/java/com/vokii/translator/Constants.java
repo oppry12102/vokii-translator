@@ -28,6 +28,9 @@ public final class Constants {
     public static final String KEY_GLOSSARY = "glossary";
     /** Transcript font-scale multiplier (float) for set_font_size. */
     public static final String KEY_FONT_SCALE = "font_scale";
+    /** Experimental: inject recent committed turns (bilingual) into the
+     *  MT prompt as conversation-history context. */
+    public static final String KEY_MT_HISTORY_CONTEXT = "mt_history_context";
 
     /** Default sampling temperature. */
     public static final float DEFAULT_TEMPERATURE = 0.3f;
@@ -55,4 +58,10 @@ public final class Constants {
      *  (cascade_latency.py n=30). Toggle from Settings if the user
      *  needs to fall back to the joint path. */
     public static final boolean DEFAULT_CASCADE_MODE = true;
+
+    /** Experimental "conversation history in MT prompt" toggle. Default
+     *  OFF: it adds ~300-600 dynamic tokens to every MT call (~10-20 ms
+     *  prefill/turn) and its translation-quality benefit is not yet
+     *  eval-verified. Enable from Settings → 实验特性. */
+    public static final boolean DEFAULT_MT_HISTORY_CONTEXT = false;
 }

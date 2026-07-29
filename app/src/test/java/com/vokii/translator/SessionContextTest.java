@@ -103,4 +103,63 @@ public class SessionContextTest {
         // If we got here without an exception, the race is fixed.
         assertTrue(ctx.buildPromptSection().contains("SESSION CONTEXT"));
     }
+
+    // ---- Experimental: CONVERSATION HISTORY (mtHistoryContext) ----
+
+    @Test
+    public void historyContextOffByDefault_noSection() {
+        SessionConfig session = new SessionConfig();  // mtHistoryContext defaults false
+        SessionContext ctx = new SessionContext(session);
+        ctx.recordUtterance(Turn.translation("你好", "hello", "zh", "en"));
+        String section = ctx.buildPromptSection();
+        assertFalse("off by default — no history section",
+                section.contains("CONVERSATION HISTORY"));
+    }
+
+    @Test
+    public void historyContextOn_rendersBilingualOldestFirst() {
+        SessionConfig session = new SessionConfig();
+        session.setMtHistoryContext(true);
+        SessionContext ctx = new SessionContext(session);
+        for (int i = 0; i < 3; i++) {
+            ctx.recordUtterance(Turn.translation("src" + i, "tgt" + i, "zh", "en"));
+        }
+        String section = ctx.buildPromptSection();
+        assertTrue(section.contains("CONVERSATION HISTORY"));
+        assertTrue("bilingual pair rendered", section.contains("\"src0\" → \"tgt0\""));
+        // Order assertion must look INSIDE the history section only — the
+        // "Recent utterances" section above it renders the same turns in
+        // newest-first order and would win indexOf.
+        String hist = section.substring(section.indexOf("CONVERSATION HISTORY"));
+        int p0 = hist.indexOf("src0");
+        int p1 = hist.indexOf("src1");
+        int p2 = hist.indexOf("src2");
+        assertTrue("oldest first", p0 >= 0 && p0 < p1 && p1 < p2);
+    }
+
+    @Test
+    public void historyContextCappedAtMax() {
+        SessionConfig session = new SessionConfig();
+        session.setMtHistoryContext(true);
+        SessionContext ctx = new SessionContext(session);
+        for (int i = 0; i < SessionContext.MAX_HISTORY_TURNS + 2; i++) {
+            ctx.recordUtterance(Turn.translation("h" + i, "x" + i, "zh", "en"));
+        }
+        String section = ctx.buildPromptSection();
+        assertFalse("oldest dropped", section.contains("\"h0\""));
+        assertFalse("second oldest dropped", section.contains("\"h1\""));
+        assertTrue("newest kept",
+                section.contains("\"h" + (SessionContext.MAX_HISTORY_TURNS + 1) + "\""));
+    }
+
+    @Test
+    public void historyContextExcludesCommandTurns() {
+        SessionConfig session = new SessionConfig();
+        session.setMtHistoryContext(true);
+        SessionContext ctx = new SessionContext(session);
+        ctx.recordUtterance(Turn.command("just a chip"));
+        String section = ctx.buildPromptSection();
+        assertFalse("no committed turns -> no section at all",
+                section.contains("CONVERSATION HISTORY"));
+    }
 }

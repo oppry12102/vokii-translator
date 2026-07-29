@@ -4,6 +4,20 @@ All notable changes to Vokii are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres loosely to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added — experimental
+- **History context (实验特性 toggle, default OFF)**: the last 6 committed
+  turns — corrected (final) source text + their committed translations —
+  are injected into the MT system prompt as a `CONVERSATION HISTORY
+  (reference only)` section, for terminology / coreference / register
+  consistency across turns. Settings-only (not in the voice catalog);
+  spec drafts share the same prompt so drafts stay consistent with
+  finals. Costs ~10–20 ms prefill per sentence; the cache structure is
+  unchanged (the session-context tail was already dynamic). Quality
+  benefit not yet eval-verified — a cascade_step2 A/B on CS-Dialogue gold
+  translations is the planned validation.
+
 ## [v2.5.2] — 2026-07-29
 
 ### Performance

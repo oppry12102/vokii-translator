@@ -176,6 +176,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         session.setDisplayMode(SessionConfig.DisplayMode.fromKey(config.getDisplayMode()));
         session.setTemperature(config.getTemperature());
         session.setCascadeEnabled(config.isCascadeMode());
+        session.setMtHistoryContext(config.isMtHistoryContext());
         session.setFontScale(config.getFontScale());
         session.setGlossary(config.getGlossary());
         // SessionContext wraps the live session state and grows with
@@ -361,6 +362,7 @@ public class MainActivity extends AppCompatActivity implements TranslationContro
         session.setDisplayMode(newMode);
         session.setTemperature(newTemp);
         session.setCascadeEnabled(newCascade);
+        session.setMtHistoryContext(config.isMtHistoryContext());
         session.setFontScale(newFont);
         session.setGlossary(config.getGlossary());
         if (changed) {

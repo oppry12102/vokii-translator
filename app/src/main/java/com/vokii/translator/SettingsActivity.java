@@ -40,6 +40,7 @@ public class SettingsActivity extends AppCompatActivity {
     private EditText inputApiKey;
     private Switch switchCascade;
     private Switch switchDebug;
+    private Switch switchMtHistoryContext;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,9 +53,11 @@ public class SettingsActivity extends AppCompatActivity {
         inputApiKey   = findViewById(R.id.input_api_key);
         switchCascade = findViewById(R.id.switch_cascade);
         switchDebug   = findViewById(R.id.switch_debug);
+        switchMtHistoryContext = findViewById(R.id.switch_mt_history_context);
 
         switchCascade.setChecked(config.isCascadeMode());
         switchDebug.setChecked(config.isDebugVisible());
+        switchMtHistoryContext.setChecked(config.isMtHistoryContext());
 
         // API key: blank by default to avoid revealing the bundled value.
         // Show the user's own value if they've previously typed one.
@@ -97,5 +100,6 @@ public class SettingsActivity extends AppCompatActivity {
         config.setApiKey(inputApiKey.getText().toString());
         config.setCascadeMode(switchCascade.isChecked());
         config.setDebugVisible(switchDebug.isChecked());
+        config.setMtHistoryContext(switchMtHistoryContext.isChecked());
     }
 }

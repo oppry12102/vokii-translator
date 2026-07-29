@@ -74,6 +74,14 @@ public final class SessionConfig {
     private volatile boolean cascadeEnabled = true;
     public boolean cascadeEnabled() { return cascadeEnabled; }
     public void setCascadeEnabled(boolean v) { this.cascadeEnabled = v; }
+    /** Experimental "conversation history in MT prompt" toggle. Read from
+     *  ConfigStore on startup/resume (same pattern as cascadeEnabled);
+     *  mirrored here so {@link SessionContext#buildPromptSection} can gate
+     *  the CONVERSATION HISTORY section. App-behavior switch, not LLM
+     *  state — deliberately NOT part of Snapshot/undo. */
+    private volatile boolean mtHistoryContext = false;
+    public boolean mtHistoryContext() { return mtHistoryContext; }
+    public void setMtHistoryContext(boolean v) { this.mtHistoryContext = v; }
     /** Debug log verbosity (NORMAL/VERBOSE/QUIET) is a UI-controlled
      *  thing owned by DebugLogger; we keep a parallel field here so the
      *  SessionContext can show it in the prompt section. MainActivity

@@ -112,6 +112,7 @@ Two real knobs (everything else baked into BuildConfig at compile time):
 | DashScope API Key | (blank → use bundled default) | Override the key compiled into the APK |
 | Cascade toggle | **ON** | Off falls back to joint Qwen-Omni Realtime |
 | Debug toggle | OFF | Show the rolling-log panel on the main screen |
+| 实验特性 · History context | **OFF** | Inject the last 6 committed turns (corrected source + committed translation) into the MT prompt as a `CONVERSATION HISTORY` section — for terminology / coreference / register consistency across turns. Costs ~10–20 ms prefill per sentence. Translation-quality benefit is plausible but not yet eval-verified; spec drafts and final MT share the same prompt so drafts stay consistent with finals. |
 
 The bundled LLM (qwen) has well-known, hardcoded endpoints in the
 engines themselves; the ASR language hint is auto-detected — exposing

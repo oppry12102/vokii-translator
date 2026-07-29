@@ -125,6 +125,44 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
+        <!-- Experimental: conversation-history context for the MT LLM.
+             Settings-only on purpose — not in the voice catalog while the
+             quality benefit is unevaluated. -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_mt_history_context"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/setting_mt_history_context_hint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <Switch
+                android:id="@+id/switch_mt_history_context"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
         <!-- No reset button — no other settings to reset. -->
         <!-- Display mode, languages, mic, style, log level, summarize,
              re-translate, copy remain voice-controlled. Say "help" or

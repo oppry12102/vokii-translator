@@ -25,6 +25,8 @@
     <string name="setting_api_key_hint">sk-…</string>
     <string name="setting_debug_enabled">Debug</string>
     <string name="setting_cascade_enabled">Cascade</string>
+    <string name="setting_mt_history_context">实验特性 · History context</string>
+    <string name="setting_mt_history_context_hint">Inject the last 6 committed turns (corrected source + translation) into the MT prompt for terminology/register consistency. +~10–20 ms per sentence. Default OFF.</string>
     <string name="about_title">About</string>
     <string name="about_developer">Developer: HUANGTAO</string>
     <string name="about_copyright">©2026 HUANGTAO. All rights reserved.</string>

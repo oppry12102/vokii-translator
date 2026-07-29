@@ -107,6 +107,20 @@ public class ConfigStore {
         prefs.edit().putBoolean(Constants.KEY_CASCADE_MODE, v).apply();
     }
 
+    /** Experimental: when ON, the last few committed turns (corrected
+     *  source + committed translation) are injected into the MT system
+     *  prompt as conversation-history context, for terminology / register
+     *  consistency across turns. Default OFF ({@link
+     *  Constants#DEFAULT_MT_HISTORY_CONTEXT}). */
+    public boolean isMtHistoryContext() {
+        return prefs.getBoolean(Constants.KEY_MT_HISTORY_CONTEXT,
+                Constants.DEFAULT_MT_HISTORY_CONTEXT);
+    }
+
+    public void setMtHistoryContext(boolean v) {
+        prefs.edit().putBoolean(Constants.KEY_MT_HISTORY_CONTEXT, v).apply();
+    }
+
     /** Source language code for the MT prompt (e.g. "zh", "en", "ja").
      *  BCP-47 short codes; the MT prompt builder uppercases them for label
      *  generation (e.g. "zh" -> "ZH:"). */

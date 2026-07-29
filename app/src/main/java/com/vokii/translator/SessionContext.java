@@ -52,10 +52,16 @@ public final class SessionContext {
     /** Cap on recent utterances. 2 is enough for "再翻一次"; 3 leaves
      *  room for short dialogues. */
     public static final int MAX_UTTERANCES = 3;
+    /** Cap on the translation-history context (experimental feature,
+     *  {@code session.mtHistoryContext()}). 6 bilingual turns ≈ 300-600
+     *  prompt tokens — enough for terminology/coreference continuity
+     *  without swamping the MT call. */
+    public static final int MAX_HISTORY_TURNS = 6;
 
     private final SessionConfig session;
     private final Deque<CommandHistoryEntry> commandHistory = new ArrayDeque<>(MAX_HISTORY + 1);
     private final Deque<Turn> recentUtterances = new ArrayDeque<>(MAX_UTTERANCES + 1);
+    private final Deque<Turn> translationHistory = new ArrayDeque<>(MAX_HISTORY_TURNS + 1);
     /** Guards {@link #commandHistory} and {@link #recentUtterances}. */
     private final Object lock = new Object();
 
@@ -77,12 +83,18 @@ public final class SessionContext {
 
     /** Record a just-committed translation turn. Called from
      *  MainActivity.onCommitted. Only TRANSLATION turns go in; COMMAND
-     *  turns (chips) are user-visible feedback, not source material. */
+     *  turns (chips) are user-visible feedback, not source material.
+     *  Feeds BOTH the command-disambiguation ring (recentUtterances) and
+     *  the experimental translation-history ring (translationHistory) —
+     *  the Turn at commit time carries the corrected (final) source text
+     *  and the committed translation. */
     public void recordUtterance(Turn t) {
         if (t == null || t.kind != Turn.Kind.TRANSLATION) return;
         synchronized (lock) {
             if (recentUtterances.size() >= MAX_UTTERANCES) recentUtterances.removeFirst();
             recentUtterances.addLast(t);
+            if (translationHistory.size() >= MAX_HISTORY_TURNS) translationHistory.removeFirst();
+            translationHistory.addLast(t);
         }
     }
 
@@ -109,9 +121,11 @@ public final class SessionContext {
         // stable arrays, not the live deques being mutated on the UI thread.
         CommandHistoryEntry[] cmds;
         Turn[] utts;
+        Turn[] hist;
         synchronized (lock) {
             cmds = commandHistory.toArray(new CommandHistoryEntry[0]);
             utts = recentUtterances.toArray(new Turn[0]);
+            hist = translationHistory.toArray(new Turn[0]);
         }
         if (cmds.length > 0) {
             sb.append("\nRecent commands (most recent first):\n");
@@ -133,6 +147,22 @@ public final class SessionContext {
           .append("\"再翻一次\", \"undo last\", or partial references. ")
           .append("Commands fire IMMEDIATELY, so the current state above ")
           .append("reflects what has actually been applied.\n");
+        // Experimental translation-quality context: bilingual committed
+        // history, oldest first (narrative order beats recency order for
+        // coreference). Gated by the Settings toggle; costs ~300-600
+        // dynamic tokens per MT call when on.
+        if (session.mtHistoryContext() && hist.length > 0) {
+            sb.append("\nCONVERSATION HISTORY (reference only)\n");
+            sb.append("=====================================\n");
+            sb.append("Recent committed turns, oldest first. Use for terminology, ")
+              .append("names and register consistency ONLY — translate ONLY the new ")
+              .append("input that follows; never re-translate or answer the history.\n");
+            for (int i = 0; i < hist.length; i++) {
+                Turn t = hist[i];
+                sb.append("  ").append(i + 1).append(". \"")
+                  .append(t.source).append("\" → \"").append(t.target).append("\"\n");
+            }
+        }
         return sb.toString();
     }
 
